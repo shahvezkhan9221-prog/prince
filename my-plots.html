@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Plots - SmartKrishi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js" type="module"></script>
+    <style>
+        /* Style for the "Add New" Floating Action Button (FAB) */
+        .fab {
+            position: fixed;
+            bottom: 6rem; /* Adjust to be above the bottom nav */
+            right: 1.5rem;
+            z-index: 20;
+        }
+        /* Simple loading spinner */
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(22, 163, 74, 0.2);
+            border-top: 4px solid #16a34a;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        /* Mic button listening animation */
+        .mic-button.listening {
+            color: #3b82f6; /* blue-500 */
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100 flex justify-center">
+
+    <div class="w-full max-w-sm h-screen bg-gray-50 flex flex-col relative overflow-hidden">
+        
+        <nav class="bg-white shadow-sm w-full flex-shrink-0 z-10">
+            <div class="px-4 py-3 flex items-center">
+                <h1 class="text-xl font-bold text-green-700">My Plots</h1>
+            </div>
+        </nav>
+
+        <main id="main-scroll-container" class="flex-grow overflow-y-auto pb-20 p-4 space-y-4">
+            
+            <div id="loading-state" class="text-center p-10">
+                <div class="loading-spinner mx-auto"></div>
+                <p class="text-gray-500 mt-2">Loading your plots...</p>
+            </div>
+
+            <div id="empty-state" class="hidden text-center p-10">
+                <i class="ph ph-map-trifold text-6xl text-gray-400 mx-auto"></i>
+                <h3 class="text-lg font-semibold text-gray-700 mt-4">No Plots Found</h3>
+                <p class="text-gray-500">Get started by adding your first plot of land.</p>
+            </div>
+
+            <div id="plot-list-container" class="space-y-4">
+                </div>
+
+        </main>
+
+        <button id="add-plot-btn" class="fab bg-green-600 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:bg-green-700 transition-all active:scale-95">
+            <i class="ph ph-plus text-3xl"></i>
+        </button>
+        
+        <footer class="bg-white border-t border-gray-200 w-full p-2 flex justify-around items-center absolute bottom-0 z-10">
+            <a href="index.html" id="home-btn" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-house text-2xl"></i><span class="text-xs">Home</span>
+            </a>
+            <a href="mandi.html" id="live-mandi-btn" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-storefront text-2xl"></i><span class="text-xs">Live Mandi</span>
+            </a>
+            <a href="my-plots.html" id="my-plots-btn" class="flex flex-col items-center text-green-600 p-1 rounded-md transition-colors bottom-nav-item active">
+                <i class="ph ph-plant text-2xl"></i><span class="text-xs font-semibold">My Plots</span>
+            </a>
+            <a href="questions.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-question text-2xl"></i><span class="text-xs">Questions</span>
+            </a>
+            <a href="menu.html" id="menu-btn" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-user-circle text-2xl"></i><span class="text-xs">Menu</span>
+            </a>
+        </footer>
+    </div>
+
+    <div id="add-plot-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Add New Plot</h3>
+            <form id="add-plot-form">
+                <div class="mb-4 relative">
+                    <label for="plotName" class="block mb-2 text-gray-700">Plot Name</label>
+                    <input type="text" id="plotName" class="w-full p-3 border border-gray-300 rounded-md pr-10" placeholder="e.g., Field by the river" required>
+                    <button type="button" id="plot-name-mic-btn" class="mic-button absolute right-3 top-10 text-gray-500 hover:text-blue-600">
+                        <i class="ph ph-microphone text-2xl"></i>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="plotArea" class="block mb-2 text-gray-700">Area</label>
+                        <input type="number" id="plotArea" class="w-full p-3 border border-gray-300 rounded-md" placeholder="5" required>
+                    </div>
+                    <div>
+                        <label for="plotAreaUnit" class="block mb-2 text-gray-700">Unit</label>
+                        <select id="plotAreaUnit" class="w-full p-3 border border-gray-300 rounded-md bg-white">
+                            <option>Acres</option>
+                            <option>Bigha</option>
+                            <option>Hectares</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="plotSoilType" class="block mb-2 text-gray-700">Soil Type</label>
+                    <select id="plotSoilType" class="w-full p-3 border border-gray-300 rounded-md bg-white">
+                        <option>Domat (दोमट)</option>
+                        <option>Baluai (बलुई)</option>
+                        <option>Chikni (चिकनी)</option>
+                        <option>Gadiya (गादिया)</option>
+                        <option>Other (अन्य)</option>
+                    </select>
+                </div>
+                
+                <div id="otherSoilTypeContainer" class="hidden mb-6 relative">
+                    <label for="otherSoilType" class="block mb-2 text-gray-700">Specify Other Soil Type</label>
+                    <input type="text" id="otherSoilType" class="w-full p-3 border border-gray-300 rounded-md pr-10" placeholder="Type soil type...">
+                    <button type="button" id="other-soil-mic-btn" class="mic-button absolute right-3 top-10 text-gray-500 hover:text-blue-600">
+                        <i class="ph ph-microphone text-2xl"></i>
+                    </button>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" id="cancel-plot-btn" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition">Cancel</button>
+                    <button type="submit" id="save-plot-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition">Save Plot</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, addDoc, serverTimestamp, query, onSnapshot, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // Your Firebase config (copied from your other files)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDg7g1N_Xjz6H-EdvW4CvAnwLiOsHlL5LE",
+            authDomain: "smaart-krishi.firebaseapp.com",
+            projectId: "smaart-krishi",
+            storageBucket: "smaart-krishi.firebasestorage.app",
+            messagingSenderId: "947583038951",
+            appId: "1:947583038951:web:1a75a02ff10ee54fc73942",
+            measurementId: "G-9NSMS22REQ"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // DOM Elements
+        const plotListContainer = document.getElementById('plot-list-container');
+        const loadingState = document.getElementById('loading-state');
+        const emptyState = document.getElementById('empty-state');
+        const addPlotBtn = document.getElementById('add-plot-btn');
+        const addPlotModal = document.getElementById('add-plot-modal');
+        const addPlotForm = document.getElementById('add-plot-form');
+        const cancelPlotBtn = document.getElementById('cancel-plot-btn');
+        const savePlotBtn = document.getElementById('save-plot-btn');
+
+        // Mic Button Elements
+        const plotNameInput = document.getElementById('plotName');
+        const plotNameMicBtn = document.getElementById('plot-name-mic-btn');
+
+        // "Other Soil" Elements
+        const plotSoilTypeSelect = document.getElementById('plotSoilType');
+        const otherSoilTypeContainer = document.getElementById('otherSoilTypeContainer');
+        const otherSoilTypeInput = document.getElementById('otherSoilType');
+        const otherSoilMicBtn = document.getElementById('other-soil-mic-btn');
+
+        let currentUser = null;
+        let plotsUnsubscribe = null;
+        let recognition = null; // Store recognition object
+        let recognitionTargetInput = null; // Store which input to fill
+
+        // --- Auth Check ---
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                loadPlots(user.uid);
+                setupSpeechRecognition(); // Setup mic logic
+            } else {
+                window.location.assign('login.html');
+            }
+        });
+
+        // --- Load Plots ---
+        function loadPlots(userId) {
+            const plotsRef = collection(db, "users", userId, "plots");
+            const q = query(plotsRef, orderBy("createdAt", "desc"));
+
+            if (plotsUnsubscribe) plotsUnsubscribe();
+
+            plotsUnsubscribe = onSnapshot(q, (snapshot) => {
+                loadingState.classList.add('hidden');
+                plotListContainer.innerHTML = ''; 
+
+                if (snapshot.empty) {
+                    emptyState.classList.remove('hidden');
+                } else {
+                    emptyState.classList.add('hidden');
+                    snapshot.forEach((doc) => {
+                        const plotData = doc.data();
+                        const plotId = doc.id;
+                        const plotCard = createPlotCard(plotData, plotId);
+                        plotListContainer.appendChild(plotCard);
+                    });
+                }
+            }, (error) => {
+                console.error("Error loading plots: ", error);
+                loadingState.classList.add('hidden');
+                plotListContainer.innerHTML = `<p class="text-red-500 text-center">Error loading plots.</p>`;
+            });
+        }
+
+        // --- Create Plot Card UI ---
+        function createPlotCard(data, id) {
+            const card = document.createElement('a');
+            card.href = `plot-detail.html?plotId=${id}`;
+            card.className = "block bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all active:scale-95";
+
+            card.innerHTML = `
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-800">${data.plotName}</h2>
+                        <p class="text-gray-500 text-sm">${data.area} ${data.areaUnit} • ${data.soilType}</p>
+                    </div>
+                    <i class="ph ph-caret-right text-gray-400 text-xl"></i>
+                </div>
+            `;
+            return card;
+        }
+
+        // --- Modal Handling ---
+        addPlotBtn.addEventListener('click', () => {
+            addPlotModal.classList.remove('hidden');
+        });
+
+        cancelPlotBtn.addEventListener('click', () => {
+            addPlotModal.classList.add('hidden');
+            addPlotForm.reset();
+            // Also hide and clear the "Other" field
+            otherSoilTypeContainer.classList.add('hidden');
+            otherSoilTypeInput.value = '';
+        });
+
+        // Show/Hide "Other" field
+        plotSoilTypeSelect.addEventListener('change', () => {
+            if (plotSoilTypeSelect.value === 'Other (अन्य)') {
+                otherSoilTypeContainer.classList.remove('hidden');
+            } else {
+                otherSoilTypeContainer.classList.add('hidden');
+            }
+        });
+
+        // --- Save New Plot ---
+        addPlotForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentUser) return;
+
+            savePlotBtn.disabled = true;
+            savePlotBtn.textContent = "Saving...";
+
+            try {
+                // Logic to get correct soil type
+                let finalSoilType = plotSoilTypeSelect.value;
+                if (finalSoilType === 'Other (अन्य)') {
+                    finalSoilType = otherSoilTypeInput.value.trim();
+                    // Basic validation:
+                    if (finalSoilType === '') {
+                        alert('Please specify the "Other" soil type.');
+                        savePlotBtn.disabled = false;
+                        savePlotBtn.textContent = "Save Plot";
+                        return; // Stop the function
+                    }
+                }
+
+                // Get data from form
+                const plotData = {
+                    plotName: plotNameInput.value,
+                    area: parseFloat(document.getElementById('plotArea').value),
+                    areaUnit: document.getElementById('plotAreaUnit').value,
+                    soilType: finalSoilType, // Use the final variable
+                    createdAt: serverTimestamp()
+                };
+
+                // Add to Firestore
+                const plotsRef = collection(db, "users", currentUser.uid, "plots");
+                await addDoc(plotsRef, plotData);
+
+                // Success
+                addPlotModal.classList.add('hidden');
+                addPlotForm.reset();
+                otherSoilTypeContainer.classList.add('hidden'); // Also reset the "Other" field
+                otherSoilTypeInput.value = '';
+
+            } catch (error) {
+                console.error("Error adding document: ", error);
+                alert("Error saving plot. Please try again.");
+            } finally {
+                // Re-enable button
+                savePlotBtn.disabled = false;
+                savePlotBtn.textContent = "Save Plot";
+            }
+        });
+
+        // --- Speech Recognition Logic ---
+        function setupSpeechRecognition() {
+            if ('webkitSpeechRecognition' in window) {
+                recognition = new webkitSpeechRecognition();
+                recognition.lang = 'hi-IN'; // Set to Hindi
+                recognition.continuous = false;
+                recognition.interimResults = false;
+
+                // Bind mic buttons to set the target input
+                plotNameMicBtn.addEventListener('click', () => startListening(plotNameInput, plotNameMicBtn));
+                otherSoilMicBtn.addEventListener('click', () => startListening(otherSoilTypeInput, otherSoilMicBtn));
+
+                // Handle the result
+                recognition.onresult = (e) => {
+                    const transcript = e.results[0][0].transcript;
+                    if (recognitionTargetInput) {
+                        recognitionTargetInput.value += (recognitionTargetInput.value ? ' ' : '') + transcript;
+                    }
+                };
+                
+                // Handle errors
+                recognition.onerror = (e) => {
+                    console.error('Speech recognition error', e.error);
+                    // Reset all mic buttons
+                    document.querySelectorAll('.mic-button').forEach(btn => btn.classList.remove('listening'));
+                    recognitionTargetInput = null;
+                };
+                
+                // Handle end of speech
+                recognition.onend = () => {
+                    document.querySelectorAll('.mic-button').forEach(btn => btn.classList.remove('listening'));
+                    recognitionTargetInput = null;
+                };
+
+            } else {
+                // Hide all mic buttons if API is not supported
+                document.querySelectorAll('.mic-button').forEach(btn => btn.style.display = 'none');
+            }
+        }
+
+        function startListening(inputField, micButton) {
+            if (recognition) {
+                // Stop any previous recognition
+                recognition.stop();
+                
+                // Set new target
+                recognitionTargetInput = inputField;
+                
+                // Reset all button styles
+                document.querySelectorAll('.mic-button').forEach(btn => btn.classList.remove('listening'));
+                
+                // Start new recognition
+                micButton.classList.add('listening');
+                try { 
+                    recognition.start(); 
+                } catch(e) { 
+                    console.error("Mic start error", e); 
+                    micButton.classList.remove('listening');
+                }
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale-1.0">
+    <title>B2B Marketplace - SmartKrishi</title>
+    <!-- Tailwind CSS --><script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons --><script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Firebase Libraries -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js" type="module"></script>
+    <style>
+        .loading-spinner-dark {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(22, 163, 74, 0.2);
+            border-top: 4px solid #16a34a;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .fab {
+            position: fixed;
+            bottom: 6rem;
+            right: 1.5rem;
+            z-index: 20;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex justify-center">
+
+    <!-- Mobile Screen Container -->
+    <div class="w-full max-w-sm h-screen bg-gray-100 flex flex-col relative overflow-hidden">
+        
+        <!-- Top Navbar -->
+        <nav class="bg-white shadow-sm w-full flex-shrink-0 z-10">
+            <div class="px-4 py-3 flex items-center">
+                <a href="mandi.html" class="text-gray-600 mr-4 p-1 rounded-full hover:bg-gray-100">
+                    <i class="ph ph-arrow-left text-2xl"></i>
+                </a>
+                <h1 class="text-xl font-bold text-green-700">B2B Marketplace</h1>
+            </div>
+        </nav>
+
+        <!-- Main Content Area (Scrollable) -->
+        <!-- Removed p-4, will add padding to content area below search -->
+        <main class="flex-grow overflow-y-auto pb-20">
+            
+            <!-- Search Bar -->
+            <div class="p-4 bg-gray-100 sticky top-0 z-[5]">
+                <div class="relative flex items-center bg-white rounded-lg shadow-sm">
+                    <span class="absolute left-3 inset-y-0 flex items-center text-gray-400">
+                        <i class="ph ph-magnifying-glass text-xl"></i>
+                    </span>
+                    <input type="text" id="search-input" placeholder="Search for crops..." class="w-full p-3 pl-10 pr-16 border-none rounded-lg focus:ring-2 focus:ring-green-500">
+                    <button id="mic-button" type="button" class="absolute right-0 inset-y-0 flex items-center justify-center w-14 text-gray-500 hover:text-green-600">
+                        <i class="ph ph-microphone text-2xl"></i>
+                    </button>
+                </div>
+                <p id="mic-status" class="text-xs text-gray-500 text-center mt-1 h-4"></p> <!-- For listening status -->
+            </div>
+
+            <!-- Content Padding -->
+            <div class="p-4">
+                <!-- Loading State -->
+                <div id="loading-state" class="text-center p-10">
+                    <div class="loading-spinner-dark mx-auto"></div>
+                    <p class="text-gray-500 mt-2">Loading listings...</p>
+                </div>
+                
+                <!-- Empty State -->
+                <div id="empty-state" class="hidden text-center p-10">
+                    <i class="ph ph-storefront text-6xl text-gray-400 mx-auto"></i>
+                    <h3 class="text-lg font-semibold text-gray-700 mt-4">No Listings Found</h3>
+                    <p class="text-gray-500">Be the first to create a listing!</p>
+                </div>
+
+                <!-- Listing List -->
+                <div id="listing-list" class="space-y-3">
+                    <!-- Listing items will be injected here by JS -->
+                </div>
+            </div>
+
+        </main>
+        
+        <!-- "Create New" FAB -->
+        <a href="create-listing.html" class="fab bg-green-600 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:bg-green-700 transition-all active:scale-95">
+            <i class="ph ph-plus text-3xl"></i>
+        </a>
+        
+        <!-- Bottom Navigation -->
+        <footer class="bg-white border-t border-gray-200 w-full p-2 flex justify-around items-center absolute bottom-0 z-10">
+             <a href="index.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-house text-2xl"></i><span class="text-xs">Home</span>
+            </a>
+             <a href="mandi.html" class="flex flex-col items-center text-green-600 p-1 rounded-md transition-colors bottom-nav-item active">
+                <i class="ph ph-storefront text-2xl"></i><span class="text-xs font-semibold">Live Mandi</span>
+            </a>
+             <a href="my-plots.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-plant text-2xl"></i><span class="text-xs">My Plots</span>
+            </a>
+             <a href="questions.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-question text-2xl"></i><span class="text-xs">Questions</span>
+            </a>
+             <a href="menu.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-user-circle text-2xl"></i><span class="text-xs">Menu</span>
+            </a>
+        </footer>
+    </div>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        // Import signInWithCustomToken
+        import { getAuth, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, query, onSnapshot, orderBy, where, doc, getDoc, addDoc, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // Firebase config - Use environment variables for security
+        const firebaseConfig = typeof __firebase_config !== 'undefined'
+          ? JSON.parse(__firebase_config)
+          : {
+              // Fallback for local testing (using your provided config)
+              apiKey: "AIzaSyDg7g1N_Xjz6H-EdvW4CvAnwLiOsHlL5LE",
+              authDomain: "smaart-krishi.firebaseapp.com",
+              projectId: "smaart-krishi",
+              storageBucket: "smaart-krishi.firebasestorage.app",
+              messagingSenderId: "947583038951",
+              appId: "1:947583038951:web:1a75a02ff10ee54fc73942",
+              measurementId: "G-9NSMS22REQ"
+            };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- DOM Elements ---
+        const loadingState = document.getElementById('loading-state');
+        const emptyState = document.getElementById('empty-state');
+        const listingList = document.getElementById('listing-list');
+        const searchInput = document.getElementById('search-input');
+        const micButton = document.getElementById('mic-button');
+        const micStatus = document.getElementById('mic-status');
+
+
+        let currentUser = null;
+        let listingsUnsubscribe = null;
+        let allListings = []; // To store all fetched listings
+        const defaultProfileLogoUrl = "https://firebasestorage.googleapis.com/v0/b/smaart-krishi.firebasestorage.app/o/Gemini_Generated_Image_x51m66x51m66x51m.png?alt=media&token=5b1b006d-a9bc-43a1-8550-5e0b642f9dea";
+
+        // --- Auth Initialization (IMPROVED) ---
+        async function initializeAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else if (!auth.currentUser) {
+                    console.log("No auth token, awaiting redirect from onAuthStateChanged.");
+                }
+            } catch (error) {
+                console.error("Auth token sign-in failed: ", error);
+            }
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUser = user;
+                    loadListings(); // Load listings once user is confirmed
+                } else {
+                    window.location.assign('login.html');
+                }
+            });
+        }
+        
+        initializeAuth(); // Start auth process
+
+        // --- Load ALL Active Listings ---
+        function loadListings() {
+            if (listingsUnsubscribe) listingsUnsubscribe();
+
+            // This query fetches from the root 'b2b-listings' collection
+            const listingsRef = collection(db, "b2b-listings");
+            
+            // This query requires a composite index in Firestore.
+            // Check your browser console for an error with a link to create it!
+            const q = query(listingsRef, where("status", "==", "Active"), orderBy("createdAt", "desc"));
+
+            listingsUnsubscribe = onSnapshot(q, (snapshot) => {
+                loadingState.classList.add('hidden');
+                
+                // Store all docs in the global array
+                allListings = snapshot.docs;
+
+                // Initial render based on (empty) search query
+                renderListings(); 
+                
+            }, (error) => {
+                console.error("Error loading listings: ", error);
+                loadingState.innerHTML = `<p class="text-red-500">Error: ${error.message}</p><p class_text-sm text-gray-500">Please check the console (F12) for an index creation link.</p>`;
+            });
+        }
+
+        // --- Render Listings based on search ---
+        function renderListings() {
+            listingList.innerHTML = ''; // Clear old list
+            const searchTerm = searchInput.value.toLowerCase();
+
+            const filteredListings = allListings.filter(doc => {
+                const data = doc.data();
+                // Check if cropName exists before calling toLowerCase
+                return data.cropName && data.cropName.toLowerCase().includes(searchTerm);
+            });
+
+            if (filteredListings.length === 0) {
+                // Show empty state if search yields no results or if db is empty
+                emptyState.classList.remove('hidden');
+                // Customize empty state message
+                if (searchTerm) {
+                    emptyState.querySelector('h3').textContent = "No Matches Found";
+                    emptyState.querySelector('p').textContent = "Try searching for a different crop.";
+                } else {
+                    emptyState.querySelector('h3').textContent = "No Listings Found";
+                    emptyState.querySelector('p').textContent = "Be the first to create a listing!";
+                }
+            } else {
+                emptyState.classList.add('hidden');
+                filteredListings.forEach(doc => {
+                    const card = createListingCard(doc.data(), doc.id);
+                    listingList.appendChild(card);
+                });
+            }
+        }
+
+        // --- Create Listing Card UI ---
+        function createListingCard(data, docId) {
+            const card = document.createElement('div');
+            card.className = "bg-white rounded-xl shadow-sm overflow-hidden";
+            
+            // Don't show "Contact Seller" if user is viewing their own post
+            const contactButtonHtml = currentUser.uid === data.sellerId 
+                ? `<a href="my-listings.html" class="text-sm font-medium bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200">Manage</a>`
+                : `<button data-seller-id="${data.sellerId}" data-seller-name="${data.sellerName}" data-seller-pic="${data.sellerProfilePic || defaultProfileLogoUrl}" class="contact-seller-btn text-sm font-medium bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700">Contact Seller</button>`;
+
+            // IMPROVEMENT: Added a check for data.createdAt before calling .toDate()
+            // This prevents an error if the data is read before the server timestamp is set.
+            const postedDate = data.createdAt ? data.createdAt.toDate().toLocaleDateString() : "Just now";
+
+            card.innerHTML = `
+                <img src="${data.imageUrl || 'https://placehold.co/600x400/e2e8f0/64748b?text=No+Image'}" alt="Produce" class="w-full h-40 object-cover">
+                <div class="p-4">
+                    <div class="flex justify-between items-center mb-1">
+                        <h3 class="text-lg font-bold text-gray-900">${data.cropName || 'Untitled Crop'}</h3>
+                        <span class="text-xl font-bold text-green-700">₹${data.price}<span class="text-sm font-normal text-gray-600">/${data.priceUnit}</span></span>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-3">${data.quantity} ${data.quantityUnit} available</p>
+                    
+                    <div class="flex items-center space-x-2 mb-4">
+                        <img src="${data.sellerProfilePic || defaultProfileLogoUrl}" class="w-8 h-8 rounded-full object-cover">
+                        <div>
+                            <p class="text-sm font-medium text-gray-800">${data.sellerName}</p>
+                            <p class="text-xs text-gray-500">${data.location}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-gray-500">Posted: ${postedDate}</span>
+                        ${contactButtonHtml}
+                    </div>
+                </div>
+            `;
+
+            // Add listener for the contact button
+            const contactBtn = card.querySelector('.contact-seller-btn');
+            if (contactBtn) {
+                contactBtn.addEventListener('click', () => {
+                    const sellerId = contactBtn.dataset.sellerId;
+                    const sellerName = contactBtn.dataset.sellerName;
+                    const sellerPic = contactBtn.dataset.sellerPic;
+                    
+                    // Call function to find/create chat
+                    findOrCreateChat(sellerId, sellerName, sellerPic);
+                });
+            }
+            return card;
+        }
+
+        // --- Search and Speech Recognition ---
+        
+        // Text search listener
+        searchInput.addEventListener('input', renderListings);
+
+        // Speech recognition setup
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.lang = 'en-IN'; // Set to English (India)
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            micButton.addEventListener('click', () => {
+                try {
+                    recognition.start();
+                    micStatus.textContent = "Listening...";
+                    micButton.classList.add('text-red-500'); // Show listening state
+                } catch(e) {
+                    console.error("Speech recognition already active.", e);
+                }
+            });
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                searchInput.value = transcript;
+                // Trigger filtering
+                renderListings();
+            };
+
+            recognition.onspeechend = () => {
+                recognition.stop();
+            };
+            
+            recognition.onend = () => {
+                micStatus.textContent = "";
+                micButton.classList.remove('text-red-500'); // Hide listening state
+            };
+
+            recognition.onerror = (event) => {
+                if (event.error === 'no-speech' || event.error === 'audio-capture') {
+                    micStatus.textContent = "Could not hear. Try again.";
+                } else if (event.error === 'not-allowed') {
+                    micStatus.textContent = "Mic permission denied.";
+                } else {
+                    micStatus.textContent = "Error, please try again.";
+                }
+                console.error("Speech recognition error:", event.error);
+                micButton.classList.remove('text-red-500');
+            };
+
+        } else {
+            // Hide mic button if API is not supported
+            micButton.style.display = 'none';
+            micStatus.textContent = "Speech recognition not supported.";
+        }
+
+
+        // --- Chat Logic ---
+        async function findOrCreateChat(targetUserId, targetUserName, targetUserPic) {
+            if (!currentUser) return;
+
+            // 1. Check if a chat with this user already exists
+            const existingChatQuery = query(
+                collection(db, "chats"),
+                where("participants", "array-contains", currentUser.uid)
+            );
+
+            const querySnapshot = await getDocs(existingChatQuery);
+            let existingChatId = null;
+
+            querySnapshot.forEach(doc => {
+                const participants = doc.data().participants;
+                if (participants.includes(targetUserId) && participants.length === 2) {
+                    existingChatId = doc.id;
+                }
+            });
+
+            let chatIdToOpen;
+            
+            if (!existingChatId) {
+                // 2. If chat doesn't exist, create it
+                try {
+                    const newChatDoc = await addDoc(collection(db, "chats"), {
+                        participants: [currentUser.uid, targetUserId],
+                        lastMessage: "Chat created",
+                        lastMessageTimestamp: serverTimestamp()
+                    });
+                    chatIdToOpen = newChatDoc.id;
+                } catch (error) {
+                    console.error("Error creating chat: ", error);
+                    // In a real app, use your custom modal here
+                    console.log("Error starting chat."); 
+                    return;
+                }
+            } else {
+                chatIdToOpen = existingChatId;
+            }
+            
+            // 3. Redirect to index.html and tell it to open the chat room
+            const chatParams = new URLSearchParams({
+                openChat: 'true',
+                chatId: chatIdToOpen,
+                otherUserId: targetUserId,
+                otherUserName: targetUserName,
+                otherUserPic: targetUserPic
+            });
+            
+            window.location.href = `index.html?${chatParams.toString()}`;
+        }
+        
+    </script>
+</body>
+</html>
+

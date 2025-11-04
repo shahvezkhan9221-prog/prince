@@ -1,0 +1,1590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartKrishi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js" type="module"></script>
+    <style>
+        /* Simple chat bubble styles */
+        .chat-bubble {
+            max-width: 75%;
+            padding: 8px 12px;
+            border-radius: 18px;
+            word-wrap: break-word;
+            display: flex; /* Make bubble a flex container */
+            align-items: center; /* Align items vertically */
+            gap: 8px; /* Space between text and button */
+        }
+        .chat-bubble.sent {
+            background-color: #16a34a; /* green-600 */
+            color: white;
+            border-bottom-right-radius: 4px;
+            align-self: flex-end;
+        }
+        .chat-bubble.received {
+            background-color: #e5e7eb; /* gray-200 */
+            color: #1f2937; /* gray-800 */
+            border-bottom-left-radius: 4px;
+            align-self: flex-start;
+        }
+        .chat-text-content {
+           flex-grow: 1; /* Allow text to take available space */
+        }
+        .tts-button {
+            background: none;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            line-height: 0; /* Prevent extra space */
+            flex-shrink: 0; /* Prevent button from shrinking */
+        }
+        .tts-button i {
+            font-size: 1.1rem; /* Adjust icon size */
+        }
+        .chat-bubble.sent .tts-button {
+             color: rgba(255, 255, 255, 0.8);
+        }
+        .chat-bubble.received .tts-button {
+             color: #6b7280; /* gray-500 */
+        }
+         .tts-button:hover {
+             opacity: 0.7;
+         }
+        .tts-button.playing i {
+             color: #2563eb; /* blue-600 */
+        }
+
+        /* Style for image in chat */
+        .chat-image {
+            max-width: 100%;
+            border-radius: 12px;
+            margin-top: 4px;
+            overflow: hidden; /* To apply border-radius to image */
+        }
+        .chat-image img {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+        /* Style for image with caption */
+        .chat-bubble.with-image {
+            padding: 0;
+            background-color: transparent;
+            overflow: hidden; /* To ensure rounded corners */
+            flex-direction: column; /* Stack image and caption vertically */
+            align-items: stretch; /* Stretch items horizontally */
+        }
+        .chat-bubble.with-image .chat-image {
+            border-bottom-left-radius: 0;
+            border-bottom-right-radius: 0;
+            margin-top: 0; /* Remove top margin for image */
+        }
+        .chat-caption-container {
+             display: flex;
+             align-items: center;
+             gap: 8px;
+             padding: 8px 12px;
+        }
+        .chat-caption {
+             flex-grow: 1;
+             padding: 0; /* Remove padding from inner caption span */
+        }
+        .chat-bubble.with-image.sent {
+            background-color: #16a34a;
+        }
+         .chat-bubble.with-image.sent .tts-button {
+             color: rgba(255, 255, 255, 0.8);
+         }
+        .chat-bubble.with-image.received {
+            background-color: #e5e7eb;
+        }
+         .chat-bubble.with-image.received .tts-button {
+             color: #6b7280;
+         }
+
+        /* Mic button listening animation */
+        .mic-button-chat.listening {
+            color: #3b82f6; /* blue-500 */
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        /* Loading spinner for image upload */
+        .chat-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        /* --- TTS Spinner Fix --- */
+        .tts-button .chat-spinner {
+             border-color: rgba(107, 114, 128, 0.3); /* gray-500 */
+             border-top-color: #6b7280; /* gray-500 */
+             width: 16px;
+             height: 16px;
+        }
+         .chat-bubble.sent .tts-button .chat-spinner {
+             border-color: rgba(255, 255, 255, 0.3);
+             border-top-color: #fff;
+         }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-200 flex justify-center">
+
+    <div class="w-full max-w-sm h-screen bg-gray-50 flex flex-col relative overflow-hidden">
+        
+        <nav id="fixed-top-header" class="bg-white shadow-sm w-full flex-shrink-0 z-20">
+            <div class="px-4 py-3 flex justify-between items-center">
+                <h1 class="text-xl font-bold text-green-700">SmartKrishi</h1>
+                <div class="flex items-center space-x-2">
+                    <button id="weather-btn" class="p-2 rounded-full hover:bg-gray-100 transition-colors"><i class="ph ph-cloud-sun text-2xl text-gray-600"></i></button>
+                    <button id="notification-btn" class="p-2 rounded-full hover:bg-gray-100 transition-colors"><i class="ph ph-bell text-2xl text-gray-600"></i></button>
+                    <button id="messenger-btn" class="p-2 rounded-full hover:bg-gray-100 transition-colors"><i class="ph ph-messenger-logo text-2xl text-gray-600"></i></button>
+                </div>
+            </div>
+        </nav>
+
+        <div id="main-scroll-container" class="flex-grow overflow-y-auto pb-20">
+            
+            <div id="sliding-header-content" class="sticky top-0 z-10 bg-white transition-transform duration-300">
+                <div class="p-4 border-t border-gray-200">
+                    <div class="relative">
+                        <input type="search" id="search-bar" placeholder="Search posts by tags or caption..." class="w-full p-2 pl-10 border border-gray-300 rounded-full bg-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                    </div>
+                </div>
+                <div id="quick-create-post-container" class="p-4 pt-0">
+                    <div id="quick-create-post" class="bg-white rounded-lg shadow-sm p-3 flex items-center cursor-pointer">
+                        <img id="quick-create-profile-pic" src="https://firebasestorage.googleapis.com/v0/b/smaart-krishi.firebasestorage.app/o/Gemini_Generated_Image_x51m66x51m66x51m.png?alt=media&token=5b1b006d-a9bc-43a1-8550-5e0b642f9dea" class="w-8 h-8 rounded-full object-cover mr-3">
+                        <span class="text-gray-500 flex-grow">Click to create post</span>
+                        <i class="ph ph-pencil-simple text-xl text-gray-500"></i>
+                    </div>
+                </div>
+            </div>
+            <div id="quick-links-container" class="px-4 pb-4 border-b border-gray-200">
+                    <div class="flex justify-around items-center text-center">
+                        
+                        <a href="news.html" class="flex flex-col items-center justify-center p-2 rounded-lg hover:bg-gray-100 transition-colors w-1/3">
+                            <i class="ph ph-newspaper text-3xl text-gray-600"></i>
+                            <span class="text-xs font-medium text-gray-700 mt-1">Daily News</span>
+                        </a>
+                        
+                        <a href="insurance.html" class="flex flex-col items-center justify-center p-2 rounded-lg hover:bg-gray-100 transition-colors w-1/3">
+                            <i class="ph ph-shield text-3xl text-gray-600"></i>
+                            <span class="text-xs font-medium text-gray-700 mt-1">Insurance</span>
+                        </a>
+                        
+                        <a href="gov-scheme.html" class="flex flex-col items-center justify-center p-2 rounded-lg hover:bg-gray-100 transition-colors w-1/3">
+                            <i class="ph ph-bank text-3xl text-gray-600"></i>
+                            <span class="text-xs font-medium text-gray-700 mt-1">Gov. Schemes</span>
+                        </a>
+                        
+                    </div>
+                </div>
+                
+            <main id="feed-container" class="px-4">
+                </main>
+        </div>
+        
+        <footer class="bg-white border-t border-gray-200 w-full p-2 flex justify-around items-center absolute bottom-0 z-10">
+            <a href="#" id="home-btn" class="flex flex-col items-center text-green-600 p-1 rounded-md transition-colors">
+                <i class="ph ph-house text-2xl"></i>
+                <span class="text-xs font-semibold">Home</span>
+            </a>
+            <a href="mandi.html" id="live-mandi-btn" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors">
+                <i class="ph ph-storefront text-2xl"></i>
+                <span class="text-xs">Live Mandi</span>
+            </a>
+           <a href="my-plots.html" id="my-plots-btn" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+    <i class="ph ph-plant text-2xl"></i>
+    <span class="text-xs">My Plots</span>
+</a>
+            <a href="questions.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors">
+                <i class="ph ph-question text-2xl"></i>
+                <span class="text-xs">Questions</span>
+            </a>
+            <a href="menu.html" id="menu-btn" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors">
+                <i class="ph ph-user-circle text-2xl"></i>
+                <span class="text-xs">Menu</span>
+            </a>
+        </footer>
+
+    </div>
+
+    <div id="create-post-page" class="hidden fixed inset-0 bg-gray-50 z-50 flex flex-col">
+        <nav class="bg-white shadow-sm w-full flex-shrink-0">
+            <div class="px-4 py-3 flex justify-between items-center">
+                <button id="back-to-home-btn" class="text-gray-600"><i class="ph ph-arrow-left text-2xl"></i></button>
+                <h2 class="text-xl font-bold text-gray-800 flex-grow text-center">Post it</h2>
+                <button type="submit" form="create-post-form-actual" id="submit-post-btn-navbar" class="text-blue-600 font-semibold text-lg opacity-50 cursor-not-allowed">Post it</button>
+            </div>
+        </nav>
+        <div class="flex-grow p-4 overflow-y-auto">
+            <form id="create-post-form-actual" class="flex flex-col h-full">
+                <div class="mb-4 relative">
+                    <textarea id="post-caption" rows="5" class="w-full p-3 border-none resize-none focus:outline-none placeholder-gray-400 text-lg" placeholder="Hint on post creation"></textarea>
+                    <button type="button" id="mic-btn" class="absolute right-3 top-3 text-gray-500 hover:text-blue-600">
+                        <i class="ph ph-microphone text-2xl"></i>
+                    </button>
+                </div>
+                <div class="space-y-3 mb-6">
+                    <label for="post-video" class="flex items-center p-3 border border-green-300 rounded-lg bg-green-50 cursor-pointer hover:bg-green-100">
+                        <i class="ph ph-video-camera text-2xl text-green-600 mr-3"></i>
+                        <span class="text-green-700 font-medium">Click and add video</span>
+                        <input type="file" id="post-video" accept="video/*" class="hidden">
+                    </label>
+                    <label for="post-photo" class="flex items-center p-3 border border-green-300 rounded-lg bg-green-50 cursor-pointer hover:bg-green-100">
+                        <i class="ph ph-image text-2xl text-green-600 mr-3"></i>
+                        <span class="text-green-700 font-medium">Add photo</span>
+                        <input type="file" id="post-photo" accept="image/*" class="hidden">
+                    </label>
+                </div>
+                <div id="file-preview-container" class="mb-4 hidden">
+                    <div class="relative w-full h-48 rounded-lg overflow-hidden border border-gray-300">
+                        <img id="image-preview" src="#" alt="Image Preview" class="hidden w-full h-full object-cover">
+                        <video id="video-preview" controls class="hidden w-full h-full object-cover"></video>
+                        <button type="button" id="remove-file-btn" class="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"><i class="ph ph-x text-lg"></i></button>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label for="post-tags" class="block mb-2 text-sm font-medium text-gray-700">Tags (comma-separated)</label>
+                    <input type="text" id="post-tags" class="w-full p-2 border border-gray-300 rounded-md" placeholder="e.g., wheat, tractor, fertilizer">
+                </div>
+                <div id="upload-progress" class="hidden w-full bg-gray-200 rounded-full mb-4">
+                    <div id="progress-bar" class="bg-blue-600 text-xs font-medium text-blue-100 text-center p-0.5 leading-none rounded-full" style="width: 0%">0%</div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="notifications-page" class="hidden absolute inset-0 bg-gray-50 z-30 flex flex-col w-full max-w-sm">
+        <nav class="bg-white shadow-sm w-full flex-shrink-0">
+            <div class="px-4 py-3 flex items-center">
+                <button id="back-from-notifications-btn" class="text-gray-600 mr-4"><i class="ph ph-arrow-left text-2xl"></i></button>
+                <h2 class="text-xl font-bold text-gray-800" style="color: #0c4b33;">Notifications</h2>
+            </div>
+        </nav>
+        <main class="flex-grow flex flex-col items-center justify-center text-center p-8">
+            <div class="w-24 h-24 mb-6 relative"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" class="w-full h-full text-green-800" style="color: #0c4b33;"><path fill="currentColor" d="M800 448c0-141.152-114.848-256-256-256S288 306.848 288 448v192H192v64h160v32c0 70.688 57.312 128 128 128s128-57.312 128-128v-32h160v-64H800V448z m-256 320a64.096 64.096 0 0 1-64-64v-32h128v32a64.096 64.096 0 0 1-64 64z m192-128H288V448c0-105.888 86.112-192 192-192s192 86.112 192 192v192z"></path></svg><div class="absolute top-1 right-5 w-6 h-6 bg-yellow-500 rounded-full border-4 border-gray-50"></div></div>
+            <h3 class="text-2xl font-bold text-gray-800 mb-2" style="color: #0c4b33;">No Notifications</h3>
+            <p class="text-gray-500">Please sit back and relax! We will notify you once we have something for you.</p>
+        </main>
+    </div>
+
+    <div id="messenger-page" class="hidden absolute inset-0 bg-gray-50 z-30 flex flex-col w-full max-w-sm">
+        <nav class="bg-white shadow-sm w-full flex-shrink-0">
+            <div class="px-4 py-3 flex justify-between items-center">
+                <button id="back-from-messenger-btn" class="text-gray-600 mr-4 p-1 rounded-full hover:bg-gray-100"><i class="ph ph-arrow-left text-2xl"></i></button>
+                <h2 class="text-xl font-bold text-gray-800">Messenger</h2>
+                <button id="new-chat-btn" class="text-green-600 p-1 rounded-full hover:bg-green-50"><i class="ph ph-pencil-simple-line text-2xl"></i></button>
+            </div>
+        </nav>
+        <main id="chat-list-container" class="flex-grow overflow-y-auto">
+            <div id="chat-list-loading" class="text-center p-10">
+                <p class="text-gray-500">Loading conversations...</p>
+            </div>
+        </main>
+    </div>
+
+    <div id="new-chat-page" class="hidden absolute inset-0 bg-white z-40 flex flex-col w-full max-w-sm">
+        <nav class="bg-white shadow-sm w-full flex-shrink-0">
+            <div class="px-4 py-3 flex items-center">
+                <button id="back-from-new-chat-btn" class="text-gray-600 mr-4 p-1 rounded-full hover:bg-gray-100"><i class="ph ph-arrow-left text-2xl"></i></button>
+                <h2 class="text-xl font-bold text-gray-800">New Message</h2>
+            </div>
+            </nav>
+        <main id="user-list-container" class="flex-grow overflow-y-auto">
+            <div id="user-list-loading" class="text-center p-10">
+                <p class="text-gray-500">Loading users...</p>
+            </div>
+        </main>
+    </div>
+
+    <div id="chat-room-page" class="hidden absolute inset-0 bg-white z-50 flex flex-col w-full max-w-sm">
+        <nav class="bg-white shadow-sm w-full flex-shrink-0">
+            <div class="px-4 py-3 flex items-center">
+                <button id="back-from-chat-room-btn" class="text-gray-600 mr-3 p-1 rounded-full hover:bg-gray-100"><i class="ph ph-arrow-left text-2xl"></i></button>
+                <img id="chat-room-user-pic" src="" class="w-9 h-9 rounded-full object-cover mr-3">
+                <h2 id="chat-room-user-name" class="text-lg font-bold text-gray-800 truncate"></h2>
+            </div>
+        </nav>
+        <main id="messages-container" class="flex-grow overflow-y-auto p-4 flex flex-col space-y-3">
+            </main>
+
+        <div id="chat-image-preview-container" class="hidden p-2 bg-gray-100 border-t border-gray-200">
+            <div class="relative w-24 h-24 rounded-lg overflow-hidden">
+                <img id="chat-image-preview" src="" alt="Image Preview" class="w-full h-full object-cover">
+                <button id="chat-cancel-image-btn" class="absolute top-1 right-1 bg-black bg-opacity-50 text-white rounded-full p-0.5">
+                    <i class="ph ph-x text-sm"></i>
+                </button>
+            </div>
+        </div>
+
+        <form id="message-form" class="flex-shrink-0 flex items-center p-2 bg-white border-t border-gray-200">
+            <label for="chat-image-input" class="p-2 text-gray-500 hover:text-green-600 cursor-pointer">
+                <i class="ph ph-paperclip text-2xl"></i>
+            </label>
+            <input type="file" id="chat-image-input" accept="image/*" class="hidden">
+            
+            <button type="button" id="chat-mic-btn" class="mic-button-chat p-2 text-gray-500 hover:text-blue-600">
+                <i class="ph ph-microphone text-2xl"></i>
+            </button>
+            
+            <input type="text" id="message-input" placeholder="Type a message..." class="w-full p-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-green-500" autocomplete="off">
+            
+            <button type="submit" id="chat-send-btn" class="ml-2 p-3 bg-green-600 text-white rounded-full hover:bg-green-700 flex items-center justify-center" style="width: 48px; height: 48px;">
+                <i id="chat-send-icon" class="ph ph-paper-plane-right text-2xl"></i>
+                <div id="chat-send-spinner" class="chat-spinner hidden"></div>
+            </button>
+        </form>
+    </div>
+    
+    <div id="weather-panel" class="fixed inset-x-0 bottom-0 max-w-sm mx-auto h-full bg-black bg-opacity-50 z-30 hidden">
+        <div id="weather-content" class="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl p-4 transform translate-y-full transition-transform duration-300">
+            <div class="flex justify-between items-center mb-4"><h2 class="text-lg font-bold text-gray-800">Weather and advisory</h2><button id="close-weather-btn"><i class="ph ph-x text-2xl text-gray-500"></i></button></div>
+            <p id="weather-location" class="text-gray-600 mb-4 font-semibold"></p>
+            <div id="weather-loading" class="hidden text-center p-8">Loading weather...</div>
+            <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="text-xs text-gray-700 uppercase bg-gray-50"><tr><th scope="col" class="px-4 py-2">Date</th><th scope="col" class="px-4 py-2">Temperature</th><th scope="col" class="px-4 py-2">Rain</th><th scope="col" class="px-4 py-2">Weather</th></tr></thead><tbody id="weather-table-body"></tbody></table></div>
+        </div>
+    </div>
+
+    <div id="alert-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-center">
+            <h3 id="alert-title" class="text-lg font-semibold text-gray-800 mb-4">Alert</h3>
+            <p id="alert-message" class="text-gray-600 mb-6">This is an alert message.</p>
+            <button id="alert-close-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition">OK</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, getDoc, getDocs, doc, serverTimestamp, updateDoc, arrayUnion, arrayRemove, where, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDg7g1N_Xjz6H-EdvW4CvAnwLiOsHlL5LE",
+            authDomain: "smaart-krishi.firebaseapp.com",
+            projectId: "smaart-krishi",
+            storageBucket: "smaart-krishi.firebasestorage.app",
+            messagingSenderId: "947583038951",
+            appId: "1:947583038951:web:1a75a02ff10ee54fc73942",
+            measurementId: "G-9NSMS22REQ"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+        const WEATHER_API_KEY = "9251d3384159bec804f3ae73eb7ecbd4"; // <-- TODO: Move to backend
+
+        // --- Main Page ---
+        const mainScrollContainer = document.getElementById('main-scroll-container');
+        const slidingHeaderContent = document.getElementById('sliding-header-content');
+        // ...
+        const feedContainer = document.getElementById('feed-container');
+        const searchBar = document.getElementById('search-bar');
+        const quickCreatePostBar = document.getElementById('quick-create-post');
+        const quickCreateProfilePic = document.getElementById('quick-create-profile-pic');
+        const homeBtn = document.getElementById('home-btn');
+
+        // --- Create Post Page ---
+        const createPostPage = document.getElementById('create-post-page');
+        const backToHomeBtn = document.getElementById('back-to-home-btn');
+        const createPostForm = document.getElementById('create-post-form-actual');
+        const submitPostBtnNavbar = document.getElementById('submit-post-btn-navbar');
+        // ... other post elements
+        const postVideoInput = document.getElementById('post-video');
+        const postPhotoInput = document.getElementById('post-photo');
+        const postCaptionInput = document.getElementById('post-caption');
+        const postTagsInput = document.getElementById('post-tags');
+        const micBtn = document.getElementById('mic-btn');
+        const uploadProgress = document.getElementById('upload-progress');
+        const progressBar = document.getElementById('progress-bar');
+        const filePreviewContainer = document.getElementById('file-preview-container');
+        const imagePreview = document.getElementById('image-preview');
+        const videoPreview = document.getElementById('video-preview');
+        const removeFileBtn = document.getElementById('remove-file-btn');
+
+
+        // --- Notifications Page ---
+        const notificationBtn = document.getElementById('notification-btn');
+        const notificationsPage = document.getElementById('notifications-page');
+        const backFromNotificationsBtn = document.getElementById('back-from-notifications-btn');
+        
+        // --- Weather Panel ---
+        const weatherBtn = document.getElementById('weather-btn');
+        const weatherPanel = document.getElementById('weather-panel');
+        // ... other weather elements
+        const weatherContent = document.getElementById('weather-content');
+        const closeWeatherBtn = document.getElementById('close-weather-btn');
+        const weatherLocationEl = document.getElementById('weather-location');
+        const weatherTableBody = document.getElementById('weather-table-body');
+        const weatherLoading = document.getElementById('weather-loading');
+
+
+        // --- Modal Elements ---
+        const alertModal = document.getElementById('alert-modal');
+        const alertCloseBtn = document.getElementById('alert-close-btn');
+        const alertTitle = document.getElementById('alert-title');
+        const alertMessage = document.getElementById('alert-message');
+
+        // --- Messenger (Inbox) Page Elements ---
+        const messengerBtn = document.getElementById('messenger-btn');
+        const messengerPage = document.getElementById('messenger-page');
+        const backFromMessengerBtn = document.getElementById('back-from-messenger-btn');
+        const newChatBtn = document.getElementById('new-chat-btn');
+        const chatListContainer = document.getElementById('chat-list-container');
+        const chatListLoading = document.getElementById('chat-list-loading');
+
+        // --- "New Chat" Page Elements ---
+        const newChatPage = document.getElementById('new-chat-page');
+        const backFromNewChatBtn = document.getElementById('back-from-new-chat-btn');
+        const userListContainer = document.getElementById('user-list-container');
+        const userListLoading = document.getElementById('user-list-loading');
+
+        // --- CHAT: Chat Room Elements ---
+        const chatRoomPage = document.getElementById('chat-room-page');
+        const backFromChatRoomBtn = document.getElementById('back-from-chat-room-btn');
+        const chatRoomUserPic = document.getElementById('chat-room-user-pic');
+        const chatRoomUserName = document.getElementById('chat-room-user-name');
+        const messagesContainer = document.getElementById('messages-container');
+        const messageForm = document.getElementById('message-form');
+        const messageInput = document.getElementById('message-input');
+        // --- CHAT: New elements for mic and image ---
+        const chatMicBtn = document.getElementById('chat-mic-btn');
+        const chatImageInput = document.getElementById('chat-image-input');
+        const chatImagePreviewContainer = document.getElementById('chat-image-preview-container');
+        const chatImagePreview = document.getElementById('chat-image-preview');
+        const chatCancelImageBtn = document.getElementById('chat-cancel-image-btn');
+        const chatSendBtn = document.getElementById('chat-send-btn');
+        const chatSendIcon = document.getElementById('chat-send-icon');
+        const chatSendSpinner = document.getElementById('chat-send-spinner');
+
+
+        let currentUser = null, userData = null, allPosts = [];
+        let chatListUnsubscribe = null; // To stop chat listener when page is closed
+        let messagesUnsubscribe = null; // To stop message listener
+        let currentChatId = null; // To track the open chat room
+        let chatImageFile = null; // To hold the image file for sending
+        const defaultProfileLogoUrl = "https://firebasestorage.googleapis.com/v0/b/smaart-krishi.firebasestorage.app/o/Gemini_Generated_Image_x51m66x51m66x51m.png?alt=media&token=5b1b006d-a9bc-43a1-8550-5e0b642f9dea";
+
+        // --- TTS State ---
+        let currentAudio = null; // Holds the currently playing Audio object
+        let currentPlayingButton = null; // Holds the button associated with the playing audio
+
+        // --- Modal Functions ---
+        function showModal(title, message) {
+            alertTitle.textContent = title;
+            alertMessage.textContent = message;
+            alertModal.classList.remove('hidden');
+        }
+
+        alertCloseBtn.addEventListener('click', () => {
+            alertModal.classList.add('hidden');
+        });
+        
+        // --- [NEW FUNCTION] ---
+        // Add this function to handle opening chat from a URL redirect
+        function handleChatRedirect() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const openChat = urlParams.get('openChat');
+
+            if (openChat === 'true') {
+                const chatId = urlParams.get('chatId');
+                const otherUserId = urlParams.get('otherUserId');
+                const otherUserName = urlParams.get('otherUserName');
+                const otherUserPic = urlParams.get('otherUserPic');
+
+                if (chatId && otherUserId && otherUserName && otherUserPic) {
+                    // We have all the info we need. Open the chat room!
+                    openChatRoom({
+                        chatId: chatId,
+                        otherUser: {
+                            uid: otherUserId,
+                            name: otherUserName,
+                            profilePicture: otherUserPic
+                        }
+                    });
+
+                    // Clean the URL so it doesn't try to open again on refresh
+                    history.replaceState(null, '', window.location.pathname);
+                }
+            }
+        }
+        // --- [END OF NEW FUNCTION] ---
+
+
+        // --- Auth State ---
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUser = user;
+                const userDoc = await getDoc(doc(db, "users", user.uid));
+                if(userDoc.exists()) {
+                    userData = userDoc.data();
+                    // Set profile pic on create bar
+                    if (userData.profilePicture) {
+                        quickCreateProfilePic.src = userData.profilePicture;
+                    } else if (user.photoURL) {
+                        quickCreateProfilePic.src = user.photoURL;
+                    } else {
+                        quickCreateProfilePic.src = defaultProfileLogoUrl;
+                    }
+                } else {
+                    console.warn("User is logged in, but no user document found.");
+                    // This user might need to be sent back to login to complete profile
+                }
+                fetchPosts();
+                
+                // --- [MODIFIED LINE] ---
+                // Now that we are logged in, check if we need to open a chat
+                handleChatRedirect(); 
+                // --- [END OF MODIFIED LINE] ---
+
+            } else {
+                window.location.assign('login.html');
+            }
+        });
+
+        // --- Page Navigation Listeners ---
+        notificationBtn.addEventListener('click', () => {
+            notificationsPage.classList.remove('hidden');
+        });
+        backFromNotificationsBtn.addEventListener('click', () => {
+            notificationsPage.classList.add('hidden');
+        });
+        
+        weatherBtn.addEventListener('click', async () => {
+            // ... weather logic ...
+            if (!userData) { 
+                showModal("Error", "Could not find user location data. Please ensure your profile is complete.");
+                return; 
+            }
+            weatherLocationEl.textContent = `${userData.district}, ${userData.state}`;
+            weatherPanel.classList.remove('hidden');
+            weatherLoading.classList.remove('hidden');
+            weatherTableBody.innerHTML = '';
+            setTimeout(() => weatherContent.classList.remove('translate-y-full'), 10);
+            try {
+                const weatherUrl = `https://api.openweathermap.org/data/2.5/forecast?q=${userData.district},IN&units=metric&appid=${WEATHER_API_KEY}`;
+                const weatherResponse = await fetch(weatherUrl);
+                const weatherData = await weatherResponse.json();
+                if (weatherData.cod !== "200") throw new Error(weatherData.message);
+                displayWeatherForecast(weatherData.list);
+            } catch (error) {
+                console.error("Failed to fetch weather:", error);
+                weatherTableBody.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-red-500">Error: ${error.message}</td></tr>`;
+            } finally {
+                weatherLoading.classList.add('hidden');
+            }
+        });
+
+        closeWeatherBtn.addEventListener('click', () => {
+            weatherContent.classList.add('translate-y-full');
+            setTimeout(() => weatherPanel.classList.add('hidden'), 300);
+        });
+        
+        quickCreatePostBar.addEventListener('click', () => createPostPage.classList.remove('hidden'));
+        backToHomeBtn.addEventListener('click', () => {
+            createPostPage.classList.add('hidden');
+            resetForm();
+        });
+        
+        homeBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            searchBar.value = '';
+            renderPosts(allPosts);
+            mainScrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        // --- Messenger (Inbox) Page Listeners ---
+        if(messengerBtn) {
+           messengerBtn.addEventListener('click', () => {
+               openMessengerPage();
+           });
+        }
+
+        backFromMessengerBtn.addEventListener('click', () => {
+            messengerPage.classList.add('hidden');
+            if (chatListUnsubscribe) {
+                chatListUnsubscribe();
+                chatListUnsubscribe = null;
+            }
+            // Stop any playing audio when closing messenger
+            stopCurrentAudio();
+        });
+        
+        newChatBtn.addEventListener('click', () => {
+            openNewChatPage();
+        });
+
+        // --- "New Chat" Page Listeners ---
+        backFromNewChatBtn.addEventListener('click', () => {
+            newChatPage.classList.add('hidden');
+        });
+
+        // --- CHAT: Chat Room Page Listeners ---
+        backFromChatRoomBtn.addEventListener('click', () => {
+            chatRoomPage.classList.add('hidden');
+            if (messagesUnsubscribe) {
+                messagesUnsubscribe();
+                messagesUnsubscribe = null;
+            }
+            currentChatId = null;
+            resetChatInput();
+            // Stop any playing audio when closing chat room
+            stopCurrentAudio();
+        });
+
+        messageForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            handleChatFormSubmit();
+        });
+
+        // --- CHAT: New Image/Mic Listeners ---
+        chatImageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                chatImageFile = file;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    chatImagePreview.src = e.target.result;
+                    chatImagePreviewContainer.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        chatCancelImageBtn.addEventListener('click', () => {
+            resetChatInput();
+        });
+
+        function resetChatInput() {
+            chatImageFile = null;
+            chatImageInput.value = '';
+            chatImagePreview.src = '';
+            chatImagePreviewContainer.classList.add('hidden');
+        }
+
+        if ('webkitSpeechRecognition' in window) {
+            const recognition = new webkitSpeechRecognition();
+            recognition.lang = 'hi-IN';
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            chatMicBtn.addEventListener('click', () => {
+                chatMicBtn.classList.add('listening');
+                try { recognition.start(); }
+                catch(e) { console.error("Mic start error", e); chatMicBtn.classList.remove('listening'); }
+            });
+
+            recognition.onresult = (e) => {
+                messageInput.value += (messageInput.value ? ' ' : '') + e.results[0][0].transcript;
+            };
+
+            recognition.onend = () => { chatMicBtn.classList.remove('listening'); };
+            recognition.onerror = (e) => {
+                console.error('Speech recognition error', e.error);
+                chatMicBtn.classList.remove('listening');
+            };
+        } else {
+            chatMicBtn.style.display = 'none';
+        }
+        // --- End of New Image/Mic Listeners ---
+
+
+        // --- CHAT: Core Logic ---
+
+        function openMessengerPage() {
+            messengerPage.classList.remove('hidden');
+            loadUserChats();
+        }
+
+        function openNewChatPage() {
+            newChatPage.classList.remove('hidden');
+            userListContainer.innerHTML = '';
+            userListLoading.classList.remove('hidden');
+            loadAllUsers();
+        }
+
+        // --- CHAT: New Chat Room Logic ---
+        function openChatRoom(chatDetails) {
+            // chatDetails = { chatId, otherUser: { uid, name, profilePicture } }
+            
+            chatRoomPage.classList.remove('hidden');
+            
+            // Set header
+            chatRoomUserPic.src = chatDetails.otherUser.profilePicture;
+            chatRoomUserName.textContent = chatDetails.otherUser.name;
+            
+            // Set current chat ID for sending messages
+            currentChatId = chatDetails.chatId;
+            
+            // Clear old messages and load new ones
+            messagesContainer.innerHTML = '<p class="text-center text-gray-500">Loading messages...</p>';
+            loadMessages(chatDetails.chatId);
+        }
+
+        function loadMessages(chatId) {
+            if (messagesUnsubscribe) messagesUnsubscribe();
+
+            const q = query(
+                collection(db, "chats", chatId, "messages"),
+                orderBy("timestamp")
+            );
+
+            messagesUnsubscribe = onSnapshot(q, (snapshot) => {
+                const messages = [];
+                snapshot.forEach(doc => {
+                    messages.push(doc.data());
+                });
+                renderMessages(messages);
+            }, (error) => {
+                console.error("Error loading messages: ", error);
+                messagesContainer.innerHTML = `<p class="text-center text-red-500 p-10">Error loading messages.</p>`;
+            });
+        }
+
+        // --- Updated renderMessages to include TTS button ---
+        function renderMessages(messages) {
+            messagesContainer.innerHTML = '';
+            if (messages.length === 0) {
+                messagesContainer.innerHTML = `<p class="text-center text-gray-500">No messages yet. Say hello!</p>`;
+                return;
+            }
+
+            messages.forEach(msg => {
+                const bubble = document.createElement('div');
+                bubble.className = 'chat-bubble';
+                let messageText = msg.text || ''; // Ensure text exists
+
+                if (msg.senderId === currentUser.uid) {
+                    bubble.classList.add('sent');
+                } else {
+                    bubble.classList.add('received');
+                }
+
+                let contentHTML = '';
+                let ttsButtonHTML = '';
+
+                // Only add TTS button if there is text content
+                if (messageText) {
+                    ttsButtonHTML = `
+                        <button class="tts-button" data-text="${encodeURIComponent(messageText)}">
+                            <i class="ph ph-speaker-simple-high"></i>
+                        </button>
+                    `;
+                }
+
+                if (msg.imageUrl) {
+                    bubble.classList.add('with-image');
+                    contentHTML += `<div class="chat-image"><img src="${msg.imageUrl}" alt="Chat Image"></div>`;
+                    // Place caption and TTS button together if there's text
+                    if (messageText) {
+                        contentHTML += `<div class="chat-caption-container">
+                                           <span class="chat-caption">${messageText}</span>
+                                           ${ttsButtonHTML}
+                                       </div>`;
+                    }
+                } else if (messageText) {
+                    // Text-only message
+                    contentHTML = `<span class="chat-text-content">${messageText}</span> ${ttsButtonHTML}`;
+                } else {
+                    contentHTML = '...'; // Placeholder
+                }
+
+                bubble.innerHTML = contentHTML;
+                messagesContainer.appendChild(bubble);
+
+                // Add event listener to the TTS button *after* it's added to the DOM
+                const ttsButton = bubble.querySelector('.tts-button');
+                if (ttsButton) {
+                    ttsButton.addEventListener('click', (e) => {
+                        const button = e.currentTarget;
+                        const textToSpeak = decodeURIComponent(button.dataset.text);
+                        playMessageAudio(textToSpeak, button);
+                    });
+                }
+            });
+
+            // Auto-scroll to bottom
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        async function handleChatFormSubmit() {
+            const messageText = messageInput.value.trim();
+            if (messageText === '' && !chatImageFile) return; // Nothing to send
+            if (!currentChatId || !currentUser) return;
+            
+            // Disable form
+            messageInput.disabled = true;
+            chatSendBtn.disabled = true;
+            chatSendIcon.classList.add('hidden');
+            chatSendSpinner.classList.remove('hidden');
+
+            const messageData = {
+                senderId: currentUser.uid,
+                text: messageText,
+                timestamp: serverTimestamp(),
+                imageUrl: null
+            };
+
+            let lastMessageText = messageText;
+
+            try {
+                // 1. If there's an image, upload it first
+                if (chatImageFile) {
+                    const storageRef = ref(storage, `chatImages/${currentChatId}/${Date.now()}_${chatImageFile.name}`);
+                    const uploadTask = await uploadBytesResumable(storageRef, chatImageFile);
+                    const downloadURL = await getDownloadURL(uploadTask.ref);
+                    
+                    messageData.imageUrl = downloadURL;
+                    
+                    // Update last message text
+                    if (messageText) {
+                        lastMessageText = messageText; // Show text if present
+                    } else {
+                        lastMessageText = "Sent an image";
+                    }
+                }
+
+                // 2. Add the new message to the subcollection
+                await addDoc(collection(db, "chats", currentChatId, "messages"), messageData);
+
+                // 3. Update the parent chat document for the inbox view
+                const chatDocRef = doc(db, "chats", currentChatId);
+                await updateDoc(chatDocRef, {
+                    lastMessage: lastMessageText,
+                    lastMessageTimestamp: serverTimestamp()
+                });
+
+                // 4. Clear the input and reset file
+                messageInput.value = '';
+                resetChatInput();
+
+            } catch (error) {
+                console.error("Error sending message: ", error);
+                showModal("Error", "Could not send message.");
+            } finally {
+                // Re-enable form
+                messageInput.disabled = false;
+                chatSendBtn.disabled = false;
+                chatSendIcon.classList.remove('hidden');
+                chatSendSpinner.classList.add('hidden');
+                messageInput.focus();
+            }
+        }
+        // --- End of Chat Room Logic ---
+
+
+        async function loadAllUsers() {
+            try {
+                const usersQuery = query(collection(db, "users"));
+                const querySnapshot = await getDocs(usersQuery);
+                
+                const users = [];
+                querySnapshot.forEach((doc) => {
+                    // Don't list the current user in the chat list
+                    if (doc.id !== currentUser.uid) {
+                        users.push({
+                            uid: doc.id,
+                            ...doc.data()
+                        });
+                    }
+                });
+                
+                renderUserList(users);
+                userListLoading.classList.add('hidden');
+
+            } catch (error) {
+                console.error("Error loading users: ", error);
+                userListContainer.innerHTML = `<p class="text-center text-red-500 p-10">Error loading users.</p>`;
+                userListLoading.classList.add('hidden');
+            }
+        }
+
+        function renderUserList(users) {
+            userListContainer.innerHTML = '';
+            if (users.length === 0) {
+                userListContainer.innerHTML = `<p class="text-center text-gray-500 p-10">No other users found.</p>`;
+                return;
+            }
+
+            users.forEach(user => {
+                const userItem = document.createElement('div');
+                userItem.className = "flex items-center p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-200";
+                
+                const userDetails = {
+                    uid: user.uid,
+                    name: user.name || "Unknown User",
+                    profilePicture: user.profilePicture || defaultProfileLogoUrl
+                };
+                
+                userItem.innerHTML = `
+                    <img src="${userDetails.profilePicture}" class="w-12 h-12 rounded-full object-cover mr-4">
+                    <div class="flex-grow overflow-hidden">
+                        <p class="font-semibold text-gray-800 truncate">${userDetails.name}</p>
+                        <p class="text-sm text-gray-500 truncate">
+                            <span class="capitalize">${user.userType || 'User'}</span>
+                            ${user.district ? ` • ${user.district}` : ''}
+                            ${user.state ? `, ${user.state}` : ''}
+                        </p>
+                    </div>
+                `;
+                
+                userItem.addEventListener('click', () => {
+                    // Pass the full user details to the findOrCreateChat function
+                    findOrCreateChat(userDetails);
+                });
+
+                userListContainer.appendChild(userItem);
+            });
+        }
+
+        async function findOrCreateChat(targetUser) {
+            // targetUser = { uid, name, profilePicture }
+            if (!currentUser) return;
+
+            // 1. Check if a chat with this user already exists
+            const existingChatQuery = query(
+                collection(db, "chats"),
+                where("participants", "array-contains", currentUser.uid)
+            );
+
+            const querySnapshot = await getDocs(existingChatQuery);
+            let existingChatId = null;
+
+            querySnapshot.forEach(doc => {
+                const participants = doc.data().participants;
+                // Find a 1-on-1 chat that contains the target user
+                if (participants.includes(targetUser.uid) && participants.length === 2) {
+                    existingChatId = doc.id;
+                }
+            });
+
+            let chatIdToOpen;
+            
+            // 2. If chat doesn't exist, create it
+            if (!existingChatId) {
+                try {
+                    const newChatDoc = await addDoc(collection(db, "chats"), {
+                        participants: [currentUser.uid, targetUser.uid],
+                        lastMessage: "Chat created",
+                        lastMessageTimestamp: serverTimestamp()
+                    });
+                    chatIdToOpen = newChatDoc.id;
+                    
+                } catch (error) {
+                    console.error("Error creating chat: ", error);
+                    showModal("Error", "Could not create chat.");
+                    return;
+                }
+            } else {
+                chatIdToOpen = existingChatId;
+            }
+            
+            // 3. Open the chat room
+            // Close the new-chat page
+            newChatPage.classList.add('hidden');
+            openChatRoom({
+                chatId: chatIdToOpen,
+                otherUser: targetUser
+            });
+        }
+        
+        function loadUserChats() {
+            if (!currentUser) return;
+
+            if (chatListUnsubscribe) chatListUnsubscribe();
+
+            chatListLoading.classList.remove('hidden');
+            chatListContainer.innerHTML = ''; 
+            
+            const q = query(
+                collection(db, "chats"), 
+                where("participants", "array-contains", currentUser.uid),
+                orderBy("lastMessageTimestamp", "desc")
+            );
+
+            chatListUnsubscribe = onSnapshot(q, async (snapshot) => {
+                const chatDocs = snapshot.docs;
+                if (chatDocs.length === 0) {
+                    chatListContainer.innerHTML = `<p class="text-center text-gray-500 p-10">No conversations yet.</p>`;
+                    chatListLoading.classList.add('hidden');
+                    return;
+                }
+
+                const chatPromises = chatDocs.map(async (chatDoc) => {
+                    const chatData = chatDoc.data();
+                    const otherUserId = chatData.participants.find(uid => uid !== currentUser.uid);
+                    if (!otherUserId) return null; 
+
+                    const userDoc = await getDoc(doc(db, "users", otherUserId));
+                    const otherUserData = userDoc.exists() ? userDoc.data() : { name: "Deleted User", profilePicture: defaultProfileLogoUrl };
+
+                    return {
+                        chatId: chatDoc.id,
+                        lastMessage: chatData.lastMessage || "...",
+                        lastMessageTimestamp: chatData.lastMessageTimestamp?.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) || '',
+                        otherUser: {
+                            uid: otherUserId,
+                            name: otherUserData.name || "Unknown User",
+                            profilePicture: otherUserData.profilePicture || defaultProfileLogoUrl
+                        }
+                    };
+                });
+
+                const chatsWithUserData = (await Promise.all(chatPromises)).filter(Boolean); 
+                
+                renderChatList(chatsWithUserData);
+                chatListLoading.classList.add('hidden');
+
+            }, (error) => {
+                console.error("Error loading chats: ", error);
+                chatListContainer.innerHTML = `<p class="text-center text-red-500 p-10">Error loading conversations.</p>`;
+                chatListLoading.classList.add('hidden');
+            });
+        }
+
+        function renderChatList(chats) {
+            chatListContainer.innerHTML = ''; 
+            if (chats.length === 0) {
+                 chatListContainer.innerHTML = `<p class="text-center text-gray-500 p-10">No conversations yet.</p>`;
+                 return;
+            }
+
+            chats.forEach(chat => {
+                const chatItem = document.createElement('div');
+                chatItem.className = "flex items-center p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-200";
+                
+                // Store all the details needed to open the chat room
+                const chatDetails = {
+                    chatId: chat.chatId,
+                    otherUser: chat.otherUser
+                };
+                
+                chatItem.innerHTML = `
+                    <img src="${chat.otherUser.profilePicture}" class="w-12 h-12 rounded-full object-cover mr-4">
+                    <div class="flex-grow overflow-hidden">
+                        <p class="font-semibold text-gray-800 truncate">${chat.otherUser.name}</p>
+                        <p class="text-sm text-gray-500 truncate">${chat.lastMessage}</p>
+                    </div>
+                    <span class="text-xs text-gray-400 ml-2 flex-shrink-0">${chat.lastMessageTimestamp}</span>
+                `;
+
+                chatItem.addEventListener('click', () => {
+                    openChatRoom(chatDetails);
+                });
+
+                chatListContainer.appendChild(chatItem);
+            });
+        }
+        // --- End of Messenger (Inbox) Page Logic ---
+
+        // --- TTS Helper Functions ---
+        function base64ToArrayBuffer(base64) {
+            const binaryString = window.atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        function pcmToWav(pcmData, sampleRate) {
+            const numChannels = 1;
+            const bytesPerSample = 2; // 16-bit PCM
+            const blockAlign = numChannels * bytesPerSample;
+            const byteRate = sampleRate * blockAlign;
+            const dataSize = pcmData.length * bytesPerSample;
+            const buffer = new ArrayBuffer(44 + dataSize);
+            const view = new DataView(buffer);
+
+            // RIFF chunk descriptor
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + dataSize, true);
+            writeString(view, 8, 'WAVE');
+            // FMT sub-chunk
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true); // Subchunk1Size for PCM
+            view.setUint16(20, 1, true); // AudioFormat = 1 (PCM)
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, byteRate, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bytesPerSample * 8, true); // BitsPerSample
+            // DATA sub-chunk
+            writeString(view, 36, 'data');
+            view.setUint32(40, dataSize, true);
+
+            // Write PCM data
+            let offset = 44;
+            for (let i = 0; i < pcmData.length; i++, offset += 2) {
+                view.setInt16(offset, pcmData[i], true);
+            }
+
+            return new Blob([view], { type: 'audio/wav' });
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+        
+        function stopCurrentAudio() {
+             if (currentAudio) {
+                 currentAudio.pause();
+                 currentAudio.currentTime = 0; // Reset playback
+                 currentAudio = null;
+             }
+             if (currentPlayingButton) {
+                 currentPlayingButton.classList.remove('playing');
+                 currentPlayingButton.innerHTML = '<i class="ph ph-speaker-simple-high"></i>'; // Reset icon
+                 currentPlayingButton = null;
+             }
+        }
+
+        // --- TTS Play Function ---
+        async function playMessageAudio(text, buttonElement) {
+            if (!text) return;
+            
+             // If this button is already playing, stop it
+             if (buttonElement === currentPlayingButton) {
+                 stopCurrentAudio();
+                 return;
+             }
+
+            // Stop any other audio that might be playing
+            stopCurrentAudio();
+            
+            // Set loading state
+            buttonElement.disabled = true;
+            buttonElement.innerHTML = '<div class="chat-spinner"></div>'; // Use updated spinner style
+
+            // --- API Key Integration ---
+            const apiKey = "AIzaSyCpU0u-kDD-dzxeCZNkXXVYSQg2dDJI97E"; // <-- TESTING KEY ADDED HERE
+            // --- End API Key Integration ---
+            
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: [{
+                    parts: [{ text: text }] // Can add voice prompts here later e.g., "Say cheerfully: " + text
+                }],
+                generationConfig: {
+                    responseModalities: ["AUDIO"],
+                    speechConfig: {
+                        voiceConfig: {
+                            prebuiltVoiceConfig: { voiceName: "Puck" } // Example voice
+                        }
+                    }
+                },
+                model: "gemini-2.5-flash-preview-tts"
+            };
+
+            try {
+                // Use fetchWithBackoff if you have it, otherwise standard fetch
+                 const response = await fetch(apiUrl, {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/json' },
+                     body: JSON.stringify(payload)
+                 });
+                 
+                if (!response.ok) {
+                     const errorData = await response.json();
+                     console.error("TTS API Error:", errorData);
+                     // More specific error handling based on status code
+                     if (response.status === 400 && errorData?.error?.message.includes('API key not valid')) {
+                         throw new Error("Invalid API Key. Please check the key.");
+                     } else if (response.status === 429) {
+                         throw new Error("API Rate limit exceeded. Please try again later.");
+                     }
+                     throw new Error(`TTS API failed: ${errorData?.error?.message || response.statusText}`);
+                 }
+
+                const result = await response.json();
+                const part = result?.candidates?.[0]?.content?.parts?.[0];
+                const audioData = part?.inlineData?.data;
+                const mimeType = part?.inlineData?.mimeType; // e.g., "audio/L16;rate=24000"
+
+                if (audioData && mimeType && mimeType.startsWith("audio/")) {
+                    const sampleRateMatch = mimeType.match(/rate=(\d+)/);
+                    if (!sampleRateMatch) throw new Error("Could not determine sample rate from MIME type.");
+                    const sampleRate = parseInt(sampleRateMatch[1], 10);
+                    
+                    const pcmData = base64ToArrayBuffer(audioData);
+                    const pcm16 = new Int16Array(pcmData); // API returns signed 16-bit PCM
+                    const wavBlob = pcmToWav(pcm16, sampleRate);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+                    
+                    currentAudio = new Audio(audioUrl);
+                    currentPlayingButton = buttonElement;
+
+                    // Update button to 'playing' state
+                    buttonElement.classList.add('playing');
+                    buttonElement.innerHTML = '<i class="ph ph-stop"></i>'; // Change to stop icon
+
+                    currentAudio.play();
+
+                    currentAudio.onended = () => {
+                        stopCurrentAudio(); // Resets button and audio object
+                        URL.revokeObjectURL(audioUrl); // Clean up blob URL
+                    };
+                    currentAudio.onerror = (e) => {
+                         console.error("Audio playback error:", e);
+                         showModal("Audio Error", "Could not play audio.");
+                         stopCurrentAudio();
+                         URL.revokeObjectURL(audioUrl);
+                    };
+
+                } else {
+                    console.error("TTS Response Issue:", result);
+                    throw new Error("Invalid audio data received from API.");
+                }
+
+            } catch (error) {
+                console.error("Error playing message audio:", error);
+                showModal("TTS Error", `Could not generate audio: ${error.message}`);
+                // Reset button if error occurs before playing
+                 if (buttonElement === currentPlayingButton) {
+                    stopCurrentAudio();
+                 } else {
+                    buttonElement.innerHTML = '<i class="ph ph-speaker-simple-high"></i>'; // Reset icon only
+                 }
+            } finally {
+                // Ensure button is re-enabled if it wasn't playing
+                if (buttonElement !== currentPlayingButton) {
+                    buttonElement.disabled = false;
+                     // Reset icon if it's still showing the spinner but not playing
+                    if (!currentPlayingButton || buttonElement !== currentPlayingButton) {
+                         buttonElement.innerHTML = '<i class="ph ph-speaker-simple-high"></i>';
+                    }
+                }
+            }
+        }
+
+// --- Scroll & Interaction ---
+        let lastScrollY = 0;
+        mainScrollContainer.addEventListener('scroll', () => {
+            // ... scroll logic ...
+            const currentScrollY = mainScrollContainer.scrollTop;
+            if (currentScrollY > lastScrollY && currentScrollY > 50) {
+                // This line HIDES the header when scrolling DOWN
+                slidingHeaderContent.classList.add('-translate-y-full');
+            } else {
+                // This line SHOWS the header when scrolling UP
+                slidingHeaderContent.classList.remove('-translate-y-full');
+            }
+            lastScrollY = currentScrollY;
+        });
+        
+        function displayWeatherForecast(forecastList) {
+            // ... weather display logic ...
+            weatherTableBody.innerHTML = '';
+            const dailyForecasts = {};
+            forecastList.forEach(item => {
+                const date = new Date(item.dt * 1000).toLocaleDateString();
+                if (!dailyForecasts[date]) dailyForecasts[date] = [];
+                dailyForecasts[date].push(item);
+            });
+            Object.values(dailyForecasts).slice(0, 5).forEach(dayItems => {
+                const representativeItem = dayItems[0];
+                const date = new Date(representativeItem.dt * 1000);
+                const temps = dayItems.map(i => i.main.temp);
+                const row = document.createElement('tr');
+                row.className = 'bg-white border-b';
+                row.innerHTML = `
+                    <td class="px-4 py-3">${date.getDate()} ${date.toLocaleString('default', { month: 'short' })}</td>
+                    <td class="px-4 py-3">${Math.round(Math.min(...temps))}° - ${Math.round(Math.max(...temps))}°C</td>
+                    <td class="px-4 py-3">${Math.round(representativeItem.pop * 100)}%</td>
+                    <td class="px-4 py-3 flex items-center space-x-2">
+                        ${getWeatherIcon(representativeItem.weather[0].main)}
+                        <span class="capitalize">${representativeItem.weather[0].description}</span>
+                    </td>`;
+                weatherTableBody.appendChild(row);
+            });
+        }
+        function getWeatherIcon(mainWeather) {
+            // ... weather icon logic ...
+            const weather = mainWeather.toLowerCase();
+            if (weather.includes("rain") || weather.includes("drizzle")) return `<i class="ph-fill ph-cloud-rain text-2xl text-blue-500"></i>`;
+            if (weather.includes("clouds")) return `<i class="ph-fill ph-cloud text-2xl text-gray-500"></i>`;
+            if (weather.includes("clear")) return `<i class="ph-fill ph-sun text-2xl text-yellow-500"></i>`;
+            return `<i class="ph-fill ph-sun text-2xl text-yellow-500"></i>`;
+        }
+
+        // --- Create Post Form Logic ---
+        function checkPostInputs() {
+            // ... post input logic ...
+            const hasFile = postVideoInput.files.length > 0 || postPhotoInput.files.length > 0;
+            const hasCaption = postCaptionInput.value.trim().length > 0;
+            const canPost = hasFile || hasCaption;
+            submitPostBtnNavbar.disabled = !canPost;
+            submitPostBtnNavbar.classList.toggle('opacity-50', !canPost);
+            submitPostBtnNavbar.classList.toggle('cursor-not-allowed', !canPost);
+        }
+        // ... post form event listeners ...
+        postVideoInput.addEventListener('change', checkPostInputs);
+        postPhotoInput.addEventListener('change', checkPostInputs);
+        postCaptionInput.addEventListener('input', checkPostInputs);
+        postVideoInput.addEventListener('change', (e) => handleFileSelection(e.target.files[0], 'video'));
+        postPhotoInput.addEventListener('change', (e) => handleFileSelection(e.target.files[0], 'image'));
+        removeFileBtn.addEventListener('click', () => {
+            postVideoInput.value = ''; postPhotoInput.value = '';
+            filePreviewContainer.classList.add('hidden');
+            videoPreview.src = ''; imagePreview.src = '';
+            checkPostInputs();
+        });
+        function handleFileSelection(file, type) {
+            // ... file selection logic ...
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    filePreviewContainer.classList.remove('hidden');
+                    imagePreview.classList.toggle('hidden', type !== 'image');
+                    videoPreview.classList.toggle('hidden', type !== 'video');
+                    if (type === 'image') imagePreview.src = e.target.result;
+                    else videoPreview.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+        if ('webkitSpeechRecognition' in window) {
+            // ... speech recognition logic ...
+            const recognition = new webkitSpeechRecognition();
+            recognition.lang = 'hi-IN';
+            recognition.continuous = false;
+            micBtn.addEventListener('click', () => {
+                micBtn.classList.add('text-blue-600');
+                recognition.start();
+            });
+            recognition.onresult = (e) => {
+                postCaptionInput.value += (postCaptionInput.value ? ' ' : '') + e.results[0][0].transcript;
+                checkPostInputs();
+            };
+            recognition.onend = () => micBtn.classList.remove('text-blue-600');
+            recognition.onerror = (e) => console.error('Speech recognition error', e.error);
+        } else { micBtn.style.display = 'none'; }
+        
+        const videoObserver = new IntersectionObserver((entries) => {
+            // ... video observer logic ...
+            entries.forEach(entry => {
+                const video = entry.target;
+                if (entry.isIntersecting) {
+                    video.currentTime = 0;
+                    video.play().catch(e => {});
+                } else {
+                    video.pause();
+                }
+            });
+        }, { threshold: 0.5 });
+        
+        searchBar.addEventListener('input', (e) => {
+            // ... search logic ...
+            const searchTerm = e.target.value.toLowerCase();
+            const filteredPosts = allPosts.filter(post => 
+                post.data.caption?.toLowerCase().includes(searchTerm) || 
+                post.data.tags?.some(tag => tag.toLowerCase().includes(searchTerm))
+            );
+            renderPosts(filteredPosts);
+        });
+
+        // --- Feed Functions (Optimized) ---
+        function fetchPosts() {
+            // ... fetch posts logic ...
+            const postsQuery = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+            onSnapshot(postsQuery, (snapshot) => {
+                allPosts = snapshot.docs.map(doc => ({ id: doc.id, data: doc.data() }));
+                renderPosts(allPosts);
+            });
+        }
+
+        // --- THIS FUNCTION IS MODIFIED ---
+        function renderPosts(postsToRender) {
+            // ... render posts logic ...
+            feedContainer.innerHTML = '';
+            postsToRender.forEach((post, index) => {
+                const postCard = createPostCard(post.id, post.data);
+                feedContainer.appendChild(postCard);
+                
+                // --- EXISTING AD (PM-KISAN) ---
+                if (searchBar.value === '' && index === 0 && postsToRender.length > 0) {
+                    const adCard = createAdvertisementCard();
+                    feedContainer.appendChild(adCard);
+                }
+
+                // --- NEW AD (KISAN TORCH) ---
+                // This inserts the new ad after the 2nd post (index 1),
+                // making it the 4th item in the feed.
+                if (searchBar.value === '' && index === 1 && postsToRender.length > 1) {
+                    const kisanTorchAd = createKisanTorchAdCard();
+                    feedContainer.appendChild(kisanTorchAd);
+                }
+            });
+            document.querySelectorAll('video.feed-video').forEach(video => videoObserver.observe(video));
+        }
+
+        function createAdvertisementCard() {
+            // ... ad card logic ...
+            const adCard = document.createElement('div');
+            adCard.className = 'bg-white rounded-lg shadow-sm overflow-hidden mb-4';
+            const adVideoUrl = "https://firebasestorage.googleapis.com/v0/b/smaart-krishi.firebasestorage.app/o/videoplayback.mp4?alt=media&token=ef28d05e-954a-441f-8bae-a909ef0c798b";
+            adCard.innerHTML = `
+                <div class="p-4 flex items-center">
+                    <div class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-white font-bold text-xs mr-3">AD</div>
+                    <div><p class="font-semibold text-gray-800">PM-KISAN Scheme</p><p class="text-xs text-gray-500">Sponsored</p></div>
+                </div>
+                <div><video controls loop muted playsinline class="w-full h-auto max-h-96 object-cover feed-video"><source src="${adVideoUrl}" type="video/mp4"></video></div>
+                <div class-"p-4"><p class="text-gray-700 font-semibold">Empowering India's Farmers!</p></div>`;
+            const adVideoEl = adCard.querySelector('video');
+            if (adVideoEl) adVideoEl.addEventListener('click', (e) => e.stopPropagation());
+            return adCard;
+        }
+
+        // --- NEW FUNCTION ADDED HERE ---
+        function createKisanTorchAdCard() {
+            const adCard = document.createElement('div');
+            adCard.className = 'bg-white rounded-lg shadow-sm overflow-hidden mb-4';
+            // This is the image URL you provided
+            const adImageUrl = "https://firebasestorage.googleapis.com/v0/b/smaart-krishi.firebasestorage.app/o/globeam-sultan-heavy-range-of-kisan-torch-500x500.webp?alt=media&token=229c82fb-9702-45a6-8967-992d2f4e82d0";
+            
+            adCard.innerHTML = `
+                <div class="p-4 flex items-center">
+                    <div class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-white font-bold text-xs mr-3">AD</div>
+                    <div>
+                        <p class="font-semibold text-gray-800">Globeam Sultan Kisan Torch</p>
+                        <p class="text-xs text-gray-500">Sponsored</p>
+                    </div>
+                </div>
+                <div>
+                    <img src="${adImageUrl}" alt="Kisan Torch Ad" class="w-full h-auto max-h-96 object-cover">
+                </div>
+                <div class="p-4">
+                     <p class="text-gray-700 font-semibold">Heavy-duty torch for all your farm needs.</p>
+                </div>`;
+            return adCard;
+        }
+
+        function createPostCard(postId, post) {
+            // ... post card logic ...
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-lg shadow-sm overflow-hidden mb-4';
+            const isLiked = post.likes?.includes(currentUser.uid);
+            let mediaContent = '';
+            if (post.videoUrl) {
+                mediaContent = `<video controls loop muted playsinline class="w-full h-auto max-h-96 object-cover feed-video"><source src="${post.videoUrl}" type="video/mp4"></video>`;
+            } else if (post.imageUrl) {
+                mediaContent = `<img src="${post.imageUrl}" alt="Post Image" class="w-full h-auto max-h-96 object-cover">`;
+            }
+            card.innerHTML = `
+                <div class="p-4 flex items-center">
+                    <img src="${post.authorProfilePic || defaultProfileLogoUrl}" class="w-10 h-10 rounded-full object-cover mr-3">
+                    <div><p class="font-semibold text-gray-800">${post.authorName || 'Anonymous User'}</p><p class="text-xs text-gray-500">${post.createdAt?.toDate().toLocaleDateString() || 'Just now'}</p></div>
+                </div>
+                <div class="relative">${mediaContent}</div>
+                <div class="p-4"><p class="text-gray-700">${post.caption || ''}</p></div>
+                ${post.tags?.length > 0 ? `<div class="px-4 pb-2 flex flex-wrap gap-2">${post.tags.map(tag => `<span class="bg-gray-200 text-gray-700 text-xs font-semibold px-2.5 py-1 rounded-full">${tag}</span>`).join('')}</div>` : ''}
+                <div class="p-4 border-t border-gray-200 flex items-center space-x-6 text-gray-600">
+                    <button data-post-id="${postId}" class="like-btn flex items-center space-x-2 hover:text-red-500 ${isLiked ? 'text-red-500' : ''}"><i class="ph ${isLiked ? 'ph-fill' : 'ph'} ph-heart text-2xl"></i><span class="text-sm font-semibold">${post.likes?.length || 0}</span></button>
+                    <button class="flex items-center space-x-2 hover:text-blue-500"><i class="ph ph-chat-circle-dots text-2xl"></i><span class="text-sm font-semibold">${post.comments?.length || 0}</span></button>
+                </div>`;
+            card.querySelector('.like-btn').addEventListener('click', handleLike);
+            const videoEl = card.querySelector('video');
+            if (videoEl) videoEl.addEventListener('click', (e) => { if (e.target === videoEl) videoEl.muted = !videoEl.muted; });
+            return card;
+        }
+
+        async function handleLike(event) {
+            // ... like logic ...
+            if (!currentUser) return;
+            const btn = event.currentTarget;
+            const postId = btn.dataset.postId;
+            const postRef = doc(db, "posts", postId);
+            const postDoc = await getDoc(postRef);
+            if (!postDoc.exists()) return;
+            const isLiked = postDoc.data().likes?.includes(currentUser.uid);
+            await updateDoc(postRef, { likes: isLiked ? arrayRemove(currentUser.uid) : arrayUnion(currentUser.uid) });
+        }
+        
+        createPostForm.addEventListener('submit', async (e) => {
+            // ... post submit logic ...
+            e.preventDefault();
+            const file = postVideoInput.files[0] || postPhotoInput.files[0];
+            const caption = postCaptionInput.value.trim();
+            if ((!caption && !file) || !currentUser) return;
+
+            if (!userData) {
+                showModal("Error", "User data not loaded. Please wait a moment and try again.");
+                return;
+            }
+
+            submitPostBtnNavbar.disabled = true;
+            uploadProgress.classList.remove('hidden');
+            let fileUrl = null, fileType = null;
+            
+            if (file) {
+                fileType = file.type.startsWith('video') ? 'video' : 'image';
+                const folder = fileType === 'video' ? 'videos' : 'images';
+                const storageRef = ref(storage, `posts/${currentUser.uid}/${folder}/${Date.now()}_${file.name}`);
+                const uploadTask = uploadBytesResumable(storageRef, file);
+                fileUrl = await new Promise((resolve, reject) => {
+                    uploadTask.on('state_changed', (snapshot) => {
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        progressBar.style.width = `${progress}%`;
+                        progressBar.textContent = `${Math.round(progress)}%`;
+                    }, (error) => reject(error), () => getDownloadURL(uploadTask.snapshot.ref).then(resolve));
+                });
+            }
+            
+            try {
+                const postData = {
+                    userId: currentUser.uid,
+                    authorName: userData.name || "Anonymous User",
+                    authorProfilePic: userData.profilePicture || currentUser.photoURL || defaultProfileLogoUrl,
+                    caption: caption,
+                    tags: postTagsInput.value.split(',').map(tag => tag.trim()).filter(Boolean),
+                    createdAt: serverTimestamp(),
+                    likes: [], Red: []
+                };
+                if (fileType === 'video') postData.videoUrl = fileUrl;
+                if (fileType === 'image') postData.imageUrl = fileUrl;
+                
+                await addDoc(collection(db, "posts"), postData);
+                resetForm();
+                backToHomeBtn.click();
+            } catch (error) {
+                console.error("Error saving post:", error);
+                showModal("Post Error", "Could not save your post. Please try again. " + error.message);
+            } finally {
+                submitPostBtnNavbar.disabled = false;
+            }
+        });
+        
+        function resetForm() {
+            // ... reset form logic ...
+            createPostForm.reset();
+            uploadProgress.classList.add('hidden');
+            filePreviewContainer.classList.add('hidden');
+            checkPostInputs();
+        }
+        
+    </script>
+</body>
+</html>

@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ask an Expert - SmartKrishi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js" type="module"></script>
+    <style>
+        /* Loading spinner */
+        .loading-spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        .loading-spinner-dark {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(22, 163, 74, 0.2);
+            border-top: 4px solid #16a34a;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Mic button listening animation */
+        .mic-button.listening {
+            color: #3b82f6;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* TTS Button Styles */
+        .tts-button {
+            background: none;
+            border: none;
+            padding: 0;
+            margin-left: 8px; /* Add some space */
+            cursor: pointer;
+            line-height: 0; /* Prevent extra space */
+            flex-shrink: 0; /* Prevent button from shrinking */
+            color: #6b7280; /* gray-500 */
+        }
+        .tts-button i {
+            font-size: 1.1rem; /* Adjust icon size */
+        }
+         .tts-button:hover {
+             opacity: 0.7;
+         }
+        .tts-button.playing i {
+             color: #2563eb; /* blue-600 */
+         }
+        /* TTS Spinner */
+        .tts-button .tts-spinner {
+             border-color: rgba(107, 114, 128, 0.3); /* gray-500 */
+             border-top-color: #6b7280; /* gray-500 */
+             width: 16px;
+             height: 16px;
+             animation: spin 1s linear infinite;
+             display: inline-block; /* Make it behave like an icon */
+         }
+    </style>
+</head>
+<body class="bg-gray-100 flex justify-center">
+
+    <div class="w-full max-w-sm h-screen bg-gray-50 flex flex-col relative overflow-hidden">
+        
+        <nav class="bg-white shadow-sm w-full flex-shrink-0 z-10">
+            <div class="px-4 py-3 flex items-center">
+                <h1 class="text-xl font-bold text-green-700">Ask an Expert</h1>
+            </div>
+        </nav>
+
+        <main id="question-history-container" class="flex-grow overflow-y-auto p-4 space-y-4 pb-40">
+            
+            <div id="loading-state" class="text-center p-10">
+                <div class="loading-spinner-dark mx-auto"></div>
+                <p class="text-gray-500 mt-2">Loading history...</p>
+            </div>
+
+            <div id="empty-state" class="hidden text-center p-10">
+                <i class="ph ph-question text-6xl text-gray-400 mx-auto"></i>
+                <h3 class="text-lg font-semibold text-gray-700 mt-4">No Questions Yet</h3>
+                <p class="text-gray-500">Ask your first question about your crops, soil, or any farm-related problem.</p>
+            </div>
+            
+        </main>
+        
+        <div class="absolute bottom-20 w-full p-4 bg-gray-100 border-t border-gray-200">
+            <form id="question-form" class="space-y-3">
+                
+                <div id="image-preview-container" class="hidden relative w-32 h-32 rounded-lg overflow-hidden border border-gray-300">
+                    <img id="image-preview" src="#" alt="Preview" class="w-full h-full object-cover">
+                    <button type="button" id="remove-image-btn" class="absolute top-1 right-1 bg-black bg-opacity-50 text-white rounded-full p-0.5">
+                        <i class="ph ph-x text-sm"></i>
+                    </button>
+                </div>
+                
+                <div class="flex items-center space-x-2">
+                    <label for="image-upload" class="flex-shrink-0 p-3 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                        <i class="ph ph-camera text-2xl text-gray-600"></i>
+                    </label>
+                    <input type="file" id="image-upload" accept="image/*" class="hidden">
+                    
+                    <button type="button" id="mic-btn" class="mic-button flex-shrink-0 p-3 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                        <i class="ph ph-microphone text-2xl text-gray-600"></i>
+                    </button>
+                    
+                    <input type="text" id="question-input" class="w-full p-3 border border-gray-300 rounded-lg" placeholder="Ask your question...">
+                    
+                    <button type="submit" id="submit-btn" class="flex-shrink-0 p-3 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                        <i id="submit-icon" class="ph ph-paper-plane-right text-2xl"></i>
+                        <div id="submit-spinner" class="loading-spinner hidden"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <footer class="bg-white border-t border-gray-200 w-full p-2 flex justify-around items-center absolute bottom-0 z-10">
+            <a href="index.html" id="home-btn" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-house text-2xl"></i><span class="text-xs">Home</span>
+            </a>
+            <a href="mandi.html" id="live-mandi-btn" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-storefront text-2xl"></i><span class="text-xs">Live Mandi</span>
+            </a>
+            <a href="my-plots.html" id="my-plots-btn" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-plant text-2xl"></i><span class="text-xs">My Plots</span>
+            </a>
+            <a href="questions.html" class="flex flex-col items-center text-green-600 p-1 rounded-md transition-colors bottom-nav-item active">
+                <i class="ph ph-question text-2xl"></i><span class="text-xs font-semibold">Questions</span>
+            </a>
+            <a href="menu.html" id="menu-btn" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-user-circle text-2xl"></i><span class="text-xs">Menu</span>
+            </a>
+        </footer>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, addDoc, serverTimestamp, query, onSnapshot, orderBy, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        // Imports for Storage are now included and correct
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+
+        // --- INSECURE API KEY FOR TESTING ---
+        const GEMINI_API_KEY = "AIzaSyAR_TpX56K0wHYIjZ7WEFNZ26muEPA2iAM";
+        // --- REMOVE BEFORE DEPLOYING ---
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDg7g1N_Xjz6H-EdvW4CvAnwLiOsHlL5LE",
+            authDomain: "smaart-krishi.firebaseapp.com",
+            projectId: "smaart-krishi",
+            storageBucket: "smaart-krishi.firebasestorage.app",
+            messagingSenderId: "947583038951",
+            appId: "1:947583038951:web:1a75a02ff10ee54fc73942",
+            measurementId: "G-9NSMS22REQ"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        // Initialize Storage
+        const storage = getStorage(app);
+
+        // DOM Elements
+        const questionForm = document.getElementById('question-form');
+        const questionInput = document.getElementById('question-input');
+        const micBtn = document.getElementById('mic-btn');
+        const imageUpload = document.getElementById('image-upload');
+        const imagePreviewContainer = document.getElementById('image-preview-container');
+        const imagePreview = document.getElementById('image-preview');
+        const removeImageBtn = document.getElementById('remove-image-btn');
+        const submitBtn = document.getElementById('submit-btn');
+        const submitIcon = document.getElementById('submit-icon');
+        const submitSpinner = document.getElementById('submit-spinner');
+        
+        const historyContainer = document.getElementById('question-history-container');
+        const loadingState = document.getElementById('loading-state');
+        const emptyState = document.getElementById('empty-state');
+
+        let currentUser = null;
+        let recognition = null;
+        let imageFile = null;
+        let historyUnsubscribe = null;
+
+        // Controller to stop the *current* API request
+        let currentApiCallController = null;
+
+        // TTS State
+        let currentAudio = null;
+        let currentPlayingButton = null;
+
+        // --- Auth Check ---
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                setupSpeechRecognition();
+                loadQuestionHistory(user.uid);
+            } else {
+                window.location.assign('login.html');
+            }
+        });
+
+        // --- Load Question History ---
+        function loadQuestionHistory(userId) {
+            const qRef = collection(db, "users", userId, "questions");
+            const q = query(qRef, orderBy("createdAt", "desc"));
+
+            if (historyUnsubscribe) historyUnsubscribe();
+
+            historyUnsubscribe = onSnapshot(q, (snapshot) => {
+                loadingState.classList.add('hidden');
+                
+                if (snapshot.empty) {
+                    emptyState.classList.remove('hidden');
+                } else {
+                    emptyState.classList.add('hidden');
+                    historyContainer.querySelectorAll('.qa-card').forEach(card => card.remove());
+                    
+                    snapshot.forEach(doc => {
+                        const card = createQACard(doc.data(), doc.id);
+                        historyContainer.appendChild(card);
+                    });
+                }
+            }, (error) => {
+                console.error("Error loading history: ", error);
+                loadingState.classList.add('hidden');
+                historyContainer.innerHTML = `<p class="text-red-500 text-center">Error loading history.</p>`;
+            });
+        }
+
+        // --- ** MODIFIED ** Create UI Card for Q&A ---
+        function createQACard(data, docId) {
+            const card = document.createElement('div');
+            card.className = "qa-card w-full";
+            card.setAttribute('data-doc-id', docId); 
+
+            const questionDate = data.createdAt ? data.createdAt.toDate().toLocaleString() : 'Just now';
+            
+            let imageHTML = '';
+            if (data.questionImageURL) {
+                // Use the URL from Firebase Storage
+                imageHTML = `<img src="${data.questionImageURL}" alt="Question Image" class="mt-2 rounded-lg max-h-48">`;
+            }
+
+            let answerHTML = '';
+            if (data.status === 'pending') {
+                answerHTML = `
+                    <div class="mt-3 bg-gray-100 p-3 rounded-lg flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            <div class="loading-spinner-dark w-5 h-5 border-2 border-t-2"></div>
+                            <span class="text-gray-500 text-sm italic">Thinking...</span>
+                        </div>
+                        <button type="button" class="stop-thinking-btn text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200" data-doc-id="${docId}">Stop</button>
+                    </div>`;
+            } else { // 'answered' or 'failed'
+                const answerText = data.answerText || "No answer provided.";
+                let ttsButtonHTML = '';
+
+                // --- START OF MODIFIED TTS BUTTON LOGIC ---
+                // **UPDATED**: Changed "I'm sorry" to "माफ़ करें" to match new prompt
+                if (answerText && !answerText.includes("माफ़ करें") && !answerText.includes("Stopped by user.")) {
+                    if (data.audioURL && data.audioURL !== "failed") {
+                        // **FAST PATH:** We have a pre-generated URL!
+                        ttsButtonHTML = `<button class="tts-button" data-audio-url="${data.audioURL}">
+                                           <i class="ph ph-speaker-simple-high"></i>
+                                       </button>`;
+                    } else if (data.audioURL === "failed") {
+                        // **SLOW PATH:** Pre-generation failed, fall back to on-demand
+                        ttsButtonHTML = `<button class="tts-button" data-text="${encodeURIComponent(answerText)}">
+                                           <i class="ph ph-speaker-simple-high"></i>
+                                       </button>`;
+                    } else if (data.audioURL === null) {
+                        // **GENERATING:** Audio is still being generated.
+                        ttsButtonHTML = `<div class="tts-button" title="Generating audio...">
+                                           <div class="tts-spinner"></div>
+                                       </div>`;
+                    } else {
+                        // **FALLBACK:** For old data or if field is missing
+                        ttsButtonHTML = `<button class="tts-button" data-text="${encodeURIComponent(answerText)}">
+                                           <i class="ph ph-speaker-simple-high"></i>
+                                       </button>`;
+                    }
+                }
+                // --- END OF MODIFIED TTS BUTTON LOGIC ---
+                    
+                answerHTML = `
+                    <div class="mt-3 bg-green-50 border border-green-200 p-3 rounded-lg">
+                        <div class="flex items-start">
+                            <p class="text-gray-800 whitespace-pre-wrap flex-grow">${answerText}</p>
+                            ${ttsButtonHTML}
+                        </div>
+                    </div>`;
+            }
+
+
+            card.innerHTML = `
+                <div class="bg-white p-3 rounded-lg shadow-sm ml-auto max-w-xs">
+                    <p class="font-semibold text-gray-700">${data.questionText}</p>
+                    ${imageHTML}
+                    <p class="text-xs text-gray-400 text-right mt-2">${questionDate}</p>
+                </div>
+                
+                <div class="mt-2 max-w-xs">
+                    ${answerHTML}
+                </div>
+            `;
+            return card;
+        }
+
+        // --- Upload Image to Firebase Storage ---
+        async function uploadImage(file, userId) {
+            if (!file) return null;
+            const storageRef = ref(storage, `users/${userId}/images/${Date.now()}_${file.name}`);
+            try {
+                const snapshot = await uploadBytes(storageRef, file);
+                const downloadURL = await getDownloadURL(snapshot.ref);
+                return downloadURL;
+            } catch (error) {
+                console.error("Error uploading image:", error);
+                alert("Error uploading image: " + error.message);
+                return null;
+            }
+        }
+
+        // --- Convert File to Base64 for API ---
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                // Resolve with only the Base64 data, not the "data:image/jpeg;base64," prefix
+                reader.onload = () => resolve(reader.result.split(',')[1]); 
+                reader.onerror = error => reject(error);
+            });
+        }
+
+
+        // --- ** MODIFIED ** Form Submit Handler ---
+        questionForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const questionText = questionInput.value.trim();
+            const currentImageFile = imageFile; // Capture file at submit time
+            
+            if (!questionText && !currentImageFile) {
+                alert("Please type a question or upload an image.");
+                return;
+            }
+            if (!currentUser) return;
+
+            if (currentApiCallController) {
+                alert("Please wait for the current question to be answered or stop it.");
+                return;
+            }
+
+            setLoading(true);
+
+            const controller = new AbortController();
+            currentApiCallController = controller;
+            let newDocRef;
+            let questionImageURL = null;
+            let imageBase64 = null;
+            let imageMimeType = null;
+
+            try {
+                // --- 1. Handle Image (if it exists) ---
+                if (currentImageFile) {
+                    // Upload to storage to get URL to save in Firestore
+                    questionImageURL = await uploadImage(currentImageFile, currentUser.uid);
+                    if (questionImageURL === null) {
+                        throw new Error("Image upload failed. Please try again.");
+                    }
+                    // Get Base64 for Gemini API call
+                    imageBase64 = await fileToBase64(currentImageFile);
+                    imageMimeType = currentImageFile.type;
+                }
+
+                // 2. Create 'pending' doc (now with image URL)
+                const qRef = collection(db, "users", currentUser.uid, "questions");
+                newDocRef = await addDoc(qRef, {
+                    questionText: questionText,
+                    questionImageURL: questionImageURL, // Save the storage URL
+                    status: "pending",
+                    createdAt: serverTimestamp(),
+                    answerText: "",
+                    audioURL: null // **MODIFICATION: Added this field**
+                });
+
+                // 3. Reset the form
+                resetForm();
+                
+                // 4. Call Gemini (pass image data and signal)
+                const answer = await callGeminiAPI(questionText, imageBase64, imageMimeType, controller.signal);
+
+                // 5. Update the document with the answer
+                await updateDoc(newDocRef, {
+                    status: "answered",
+                    answerText: answer
+                });
+
+                // --- **MODIFICATION: Added this block** ---
+                // 6. Asynchronously pre-generate audio (don't await)
+                pregenerateAndStoreAudio(newDocRef.id, answer);
+                // --- **END OF MODIFICATION** ---
+
+            } catch (error) {
+                console.error("Error processing question: ", error);
+                
+                if (error.name === 'AbortError') {
+                    console.log("Request aborted by user.");
+                    if (newDocRef) { 
+                        await updateDoc(newDocRef, {
+                            status: "answered",
+                            answerText: "Stopped by user.",
+                            audioURL: "failed" // Mark audio as failed too
+                        });
+                    }
+                } else {
+                    alert("Error processing question. " + error.message);
+                    if (newDocRef) {
+                        await updateDoc(newDocRef, {
+                            status: "answered",
+                            answerText: "Sorry, I couldn't get an answer. Please try again. \nError: " + error.message,
+                            audioURL: "failed" // Mark audio as failed
+                        });
+                    }
+                }
+            } finally {
+                setLoading(false);
+                if (currentApiCallController === controller) {
+                    currentApiCallController = null;
+                }
+            }
+        });
+
+        
+        // --- ** REPLACED PROMPT ** Call Gemini Function (Now supports images) ---
+        async function callGeminiAPI(questionText, imageBase64, imageMimeType, signal) { 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
+            
+            // --- THIS IS THE NEW, STRICTER "KISAN LANGUAGE" PROMPT ---
+            const basePrompt = `
+                You are 'SmartKrishi,' an expert agricultural advisor (कृषि विशेषज्ञ).
+                Your response MUST be in simple Hindi (Hinglish is also okay). Use language a kisan (farmer) can easily understand.
+
+                FIRST, check if the user's question (and image, if provided) is related to farming (खेती-बाड़ी, फसल, मिट्टी, कीड़े, बीमारी, खाद).
+
+                IF IT IS NOT a farming question, you MUST respond ONLY with this exact Hindi text:
+                "माफ़ करें, मैं एक कृषि सहायक हूँ। मैं केवल खेती, फसल, और मिट्टी से जुड़े सवालों का जवाब दे सकता हूँ।"
+
+                IF IT IS a farming question, you MUST provide your answer using this EXACT format.
+                DO NOT use markdown like '**' or '*'.
+                Use plain text headings. Put an empty line (a gap) after each heading.
+                For lists, use numbers like 1., 2., 3.
+
+                समस्या (Problem):
+                (Explain the problem in simple Hindi.)
+
+                समाधान (Solution):
+                (Provide numbered steps. e.g., "1. [Step 1 in Hindi]")
+                (e.g., "2. [Step 2 in Hindi]")
+
+                बचाव (Prevention):
+                (Provide 2-3 numbered steps for prevention in Hindi.)
+
+                सलाह (Disclaimer):
+                यह सलाह AI द्वारा दी गई है। किसी भी बड़े फैसले के लिए, कृपया स्थानीय कृषि विशेषज्ञ से सलाह लें।
+                ---
+                Here is the farmer's question:
+                "${questionText || (imageBase64 ? "Please identify the problem in this image." : "")}"
+            `;
+            // --- END OF NEW PROMPT ---
+
+            // --- Build payload parts dynamically ---
+            const parts = [
+                { text: basePrompt }
+            ];
+
+            if (imageBase64 && imageMimeType) {
+                parts.push({
+                    inlineData: {
+                        mimeType: imageMimeType,
+                        data: imageBase64
+                    }
+                });
+            }
+
+            const payload = {
+                contents: [{
+                    parts: parts // Use dynamic parts array
+                }]
+            };
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                signal: signal
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData?.error?.message || `API request failed with status ${response.status}`);
+            }
+
+            const result = await response.json();
+            const answerText = result?.candidates?.[0]?.content?.parts?.[0]?.text || "No response text found.";
+            return answerText;
+        }
+
+        // --- ** NEW FUNCTION **: Pre-generates audio and saves to Storage ---
+        async function pregenerateAndStoreAudio(docId, text) {
+            // **UPDATED**: Changed "I'm sorry" to "माफ़ करें"
+            if (!text || !currentUser || text.includes("माफ़ करें") || text.includes("Stopped by user.") || text.includes("Sorry, I couldn't get an answer.")) {
+                // Don't generate audio for non-answers or short errors
+                if (docId) {
+                     const docRef = doc(db, "users", currentUser.uid, "questions", docId);
+                     await updateDoc(docRef, { audioURL: "failed" });
+                }
+                return;
+            }
+
+            const apiKey = GEMINI_API_KEY;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{ parts: [{ text: text }] }],
+                generationConfig: {
+                    responseModalities: ["AUDIO"],
+                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } } }
+                },
+                model: "gemini-2.5-flash-preview-tts"
+            };
+
+            try {
+                // 1. Fetch audio data from API
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`TTS API failed: ${errorData?.error?.message || response.statusText}`);
+                }
+                
+                const result = await response.json();
+                const part = result?.candidates?.[0]?.content?.parts?.[0];
+                const audioData = part?.inlineData?.data;
+                const mimeType = part?.inlineData?.mimeType;
+
+                if (audioData && mimeType && mimeType.startsWith("audio/")) {
+                    const sampleRateMatch = mimeType.match(/rate=(\d+)/);
+                    if (!sampleRateMatch) throw new Error("Could not determine sample rate.");
+                    const sampleRate = parseInt(sampleRateMatch[1], 10);
+                    
+                    // 2. Convert PCM to WAV Blob
+                    const pcmDataBuffer = base64ToArrayBuffer(audioData);
+                    const wavBlob = pcmToWav(pcmDataBuffer, sampleRate);
+
+                    // 3. Upload Blob to Firebase Storage
+                    const storageRef = ref(storage, `users/${currentUser.uid}/questionAudio/${docId}.wav`);
+                    const snapshot = await uploadBytes(storageRef, wavBlob);
+                    const downloadURL = await getDownloadURL(snapshot.ref);
+
+                    // 4. Update Firestore doc with the new URL
+                    const docRef = doc(db, "users", currentUser.uid, "questions", docId);
+                    await updateDoc(docRef, {
+                        audioURL: downloadURL
+                    });
+                    console.log(`Audio pre-generated and stored for doc ${docId}`);
+
+                } else {
+                    throw new Error("Invalid audio data received from API.");
+                }
+
+            } catch (error) {
+                console.error(`Error pre-generating audio for doc ${docId}:`, error);
+                // Update the doc to show a failure so we don't try again
+                const docRef = doc(db, "users", currentUser.uid, "questions", docId);
+                await updateDoc(docRef, {
+                    audioURL: "failed" // Use a string to indicate failure
+                });
+            }
+        }
+
+
+        // --- Loading State for Button ---
+        function setLoading(isLoading) {
+            if (isLoading) {
+                submitBtn.disabled = true;
+                submitIcon.classList.add('hidden');
+                submitSpinner.classList.remove('hidden');
+                questionInput.disabled = true;
+            } else {
+                submitBtn.disabled = false;
+                submitIcon.classList.remove('hidden');
+                submitSpinner.classList.add('hidden');
+                questionInput.disabled = false;
+            }
+        }
+
+        // --- Reset Form ---
+        function resetForm() {
+            questionInput.value = '';
+            imageFile = null;
+            imageUpload.value = null; // Clear file input
+            imagePreviewContainer.classList.add('hidden');
+        }
+
+        // --- Image Preview ---
+        imageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                imageFile = file; // Store the file object globally
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    imagePreview.src = event.target.result;
+                    imagePreviewContainer.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            } else {
+                resetForm(); // Clear preview if no file is selected
+            }
+        });
+
+        removeImageBtn.addEventListener('click', resetForm);
+
+        // --- Speech Recognition ---
+        function setupSpeechRecognition() {
+            if ('webkitSpeechRecognition' in window) {
+                recognition = new webkitSpeechRecognition();
+                recognition.lang = 'hi-IN';
+                recognition.continuous = false;
+                recognition.interimResults = false;
+
+                micBtn.addEventListener('click', () => {
+                    micBtn.classList.add('listening');
+                    try { recognition.start(); }
+                    catch(e) { micBtn.classList.remove('listening'); }
+                });
+
+                recognition.onresult = (e) => {
+                    questionInput.value += (questionInput.value ? ' ' : '') + e.results[0][0].transcript;
+                };
+                recognition.onend = () => micBtn.classList.remove('listening');
+                recognition.onerror = () => micBtn.classList.remove('listening');
+            } else {
+                micBtn.style.display = 'none';
+            }
+        }
+
+        // --- ** MODIFIED ** Global click listener for Stop and TTS buttons ---
+        historyContainer.addEventListener('click', async (e) => {
+            const stopButton = e.target.closest('.stop-thinking-btn');
+            const ttsButton = e.target.closest('.tts-button');
+
+            if (stopButton) {
+                // Handle Stop Button Click
+                const docId = stopButton.getAttribute('data-doc-id');
+                if (!currentUser || !docId) return;
+
+                // Also, if this stopped request was the 'current' one, abort its controller
+                if (currentApiCallController) { 
+                     // We can't be 100% sure this button matches the controller
+                     // but it's the most likely scenario.
+                     currentApiCallController.abort();
+                     console.log("Attempted to abort active API call.");
+                } else {
+                    // If there's no active controller, just update the doc
+                    // (e.g., if the user reloaded the page)
+                    const docRef = doc(db, "users", currentUser.uid, "questions", docId);
+                    try {
+                        await updateDoc(docRef, {
+                            status: "answered", // Mark as answered
+                            answerText: "Stopped by user.", // Set the text
+                            audioURL: "failed"
+                        });
+                        console.log(`Question ${docId} marked as stopped.`);
+                    } catch (error) {
+                        console.error("Error updating document to stopped state:", error);
+                        alert("Could not stop the request. Please refresh.");
+                    }
+                }
+
+            } else if (ttsButton) {
+                // Handle TTS Button Click
+                // **MODIFICATION: Pass the element, not the text**
+                playMessageAudio(ttsButton);
+            }
+        });
+
+        // --- TTS Helper Functions ---
+        function base64ToArrayBuffer(base64) {
+            const binaryString = window.atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        function pcmToWav(pcmData, sampleRate) {
+            const numChannels = 1;
+            const bytesPerSample = 2; // 16-bit PCM
+            const blockAlign = numChannels * bytesPerSample;
+            const byteRate = sampleRate * blockAlign;
+            const dataSize = pcmData.byteLength; 
+            const buffer = new ArrayBuffer(44 + dataSize);
+            const view = new DataView(buffer);
+
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + dataSize, true);
+            writeString(view, 8, 'WAVE');
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true); 
+            view.setUint16(20, 1, true); 
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, byteRate, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bytesPerSample * 8, true); 
+            writeString(view, 36, 'data');
+            view.setUint32(40, dataSize, true);
+
+            const pcmBytes = new Uint8Array(pcmData);
+            for (let i = 0; i < dataSize; i++) {
+                 view.setUint8(44 + i, pcmBytes[i]);
+            }
+
+            return new Blob([view], { type: 'audio/wav' });
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+        
+        function stopCurrentAudio() {
+             if (currentAudio) {
+                 currentAudio.pause();
+                 currentAudio.currentTime = 0; 
+                 currentAudio = null;
+             }
+             if (currentPlayingButton) {
+                 currentPlayingButton.classList.remove('playing');
+                 currentPlayingButton.innerHTML = '<i class="ph ph-speaker-simple-high"></i>'; 
+                 currentPlayingButton = null;
+             }
+        }
+
+        // --- ** REPLACED "SMART" TTS Play Function ** ---
+        async function playMessageAudio(buttonElement) {
+            // Check if it has a URL to play directly
+            const audioUrl = buttonElement.dataset.audioUrl;
+            
+            if (audioUrl) {
+                // --- FAST PATH: Play pre-generated audio ---
+                if (buttonElement === currentPlayingButton) {
+                    stopCurrentAudio();
+                    return;
+                }
+                stopCurrentAudio();
+                
+                buttonElement.classList.add('playing');
+                buttonElement.innerHTML = '<i class="ph ph-stop"></i>';
+                
+                currentAudio = new Audio(audioUrl);
+                currentPlayingButton = buttonElement;
+
+                currentAudio.play();
+                
+                currentAudio.onended = () => stopCurrentAudio();
+                currentAudio.onerror = (e) => {
+                    console.error("Audio playback error:", e);
+                    alert("Audio Error: Could not play audio.");
+                    stopCurrentAudio();
+                };
+
+            } else {
+                // --- SLOW PATH: Generate audio on-demand (fallback) ---
+                const textToSpeak = decodeURIComponent(buttonElement.dataset.text);
+                if (!textToSpeak) return;
+
+                if (buttonElement === currentPlayingButton) {
+                    stopCurrentAudio();
+                    return;
+                }
+                stopCurrentAudio();
+                
+                buttonElement.disabled = true;
+                buttonElement.innerHTML = '<div class="tts-spinner"></div>'; 
+                
+                const apiKey = GEMINI_API_KEY; 
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+
+                const payload = {
+                    contents: [{ parts: [{ text: textToSpeak }] }],
+                    generationConfig: {
+                        responseModalities: ["AUDIO"],
+                        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } } }
+                    },
+                    model: "gemini-2.5-flash-preview-tts"
+                };
+
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(`TTS API failed: ${errorData?.error?.message || response.statusText}`);
+                    }
+                    
+                    const result = await response.json();
+                    const part = result?.candidates?.[0]?.content?.parts?.[0];
+                    const audioData = part?.inlineData?.data;
+                    const mimeType = part?.inlineData?.mimeType; 
+
+                    if (audioData && mimeType && mimeType.startsWith("audio/")) {
+                        const sampleRateMatch = mimeType.match(/rate=(\d+)/);
+                        if (!sampleRateMatch) throw new Error("Could not determine sample rate.");
+                        const sampleRate = parseInt(sampleRateMatch[1], 10);
+                        
+                        const pcmDataBuffer = base64ToArrayBuffer(audioData);
+                        const wavBlob = pcmToWav(pcmDataBuffer, sampleRate);
+                        const audioUrl = URL.createObjectURL(wavBlob);
+                        
+                        currentAudio = new Audio(audioUrl);
+                        currentPlayingButton = buttonElement;
+                        buttonElement.classList.add('playing');
+                        buttonElement.innerHTML = '<i class="ph ph-stop"></i>'; 
+                        currentAudio.play();
+                        currentAudio.onended = () => { stopCurrentAudio(); URL.revokeObjectURL(audioUrl); };
+                        currentAudio.onerror = (e) => { 
+                            console.error("Audio playback error:", e);
+                            alert("Audio Error: Could not play audio.");
+                            stopCurrentAudio(); 
+                            URL.revokeObjectURL(audioUrl); 
+                        };
+                    } else {
+                        throw new Error("Invalid audio data received.");
+                    }
+                } catch (error) {
+                    console.error("Error playing message audio:", error);
+                    alert("TTS Error: " + error.message);
+                    if (buttonElement === currentPlayingButton) stopCurrentAudio();
+                    else buttonElement.innerHTML = '<i class="ph ph-speaker-simple-high"></i>';
+                } finally {
+                    if (buttonElement !== currentPlayingButton) {
+                        buttonElement.disabled = false;
+                        if (!currentPlayingButton || buttonElement !== currentPlayingButton) {
+                            buttonElement.innerHTML = '<i class="ph ph-speaker-simple-high"></i>';
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>

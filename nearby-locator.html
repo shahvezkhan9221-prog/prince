@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-g">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nearby Locator - SmartKrishi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js" type="module"></script>
+    
+    <style>
+        /* Base styles */
+        .header {
+            background: linear-gradient(135deg, #16a34a, #15803d);
+            color: white;
+            padding: 12px 16px; 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
+        }
+        .header h1 {
+            font-weight: 600; 
+            font-size: 1.25rem; 
+        }
+        .bottom-nav {
+            background: white;
+            border-top: 1px solid #e5e7eb;
+            padding: 12px 0;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            max-width: 400px;
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 0;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+        .nav-item.active {
+            color: #16a34a;
+        }
+        .nav-item.active i {
+            background-color: #dcfce7;
+            padding: 8px;
+            border-radius: 50%;
+        }
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            transition: all 0.3s ease;
+        }
+        .loading-spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(22, 163, 74, 0.2);
+            border-top: 3px solid #16a34a;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* --- === MAP STYLES === --- */
+        #map {
+            width: 100%;
+            height: 450px; /* Taller map for dedicated page */
+            border-radius: 16px;
+            z-index: 5;
+            background-color: #f3f4f6; /* Placeholder color */
+        }
+        .map-filter-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: white;
+            border-radius: 12px;
+            padding: 12px 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #4b5563;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transition: all 0.2s ease;
+            border: 2px solid white;
+        }
+        .map-filter-btn i {
+            font-size: 1.5rem;
+            margin-bottom: 4px;
+        }
+        .map-filter-btn.active {
+            color: #16a34a;
+            border-color: #16a34a;
+            box-shadow: 0 4px 8px rgba(22, 163, 74, 0.1);
+        }
+        
+        /* --- Google Maps Info Window Styles --- */
+        .gm-style-iw-c {
+            padding: 0 !important;
+            border-radius: 12px !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+        }
+        .gm-style-iw-d {
+            overflow: hidden !important; /* Hide scrollbar */
+        }
+        .map-popup-content {
+            padding: 12px;
+            width: 240px;
+        }
+        .map-popup-content h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+        .map-popup-content p {
+            font-size: 0.875rem;
+            color: #4b5563;
+            margin-bottom: 2px;
+        }
+        .map-popup-content .price {
+            font-weight: 600;
+            color: #16a34a;
+        }
+        .map-popup-content .price.loading {
+            font-weight: 400;
+            font-style: italic;
+            color: #6b7280;
+        }
+        .map-popup-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            border-top: 1px solid #f3f4f6;
+            padding-top: 12px;
+        }
+        .map-popup-btn {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            border-radius: 8px;
+            text-align: center;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-block;
+            cursor: pointer;
+            border: none;
+        }
+        .map-popup-btn.directions {
+            background-color: #f0fdf4;
+            color: #15803d;
+        }
+        .map-popup-btn.directions:hover {
+            background-color: #dcfce7;
+        }
+        .map-popup-btn.book {
+            background-color: #16a34a;
+            color: white;
+        }
+        .map-popup-btn.book:hover {
+            background-color: #15803d;
+        }
+
+        /* --- === NEW STYLES FOR COMPARISON LIST === --- */
+        .comparison-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border: 1px solid #e5e7eb;
+        }
+        .comparison-card.storage {
+            background: #f0f9ff; /* Light blue for storages */
+            border-color: #bae6fd;
+        }
+        .comparison-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .comparison-card-header h3 {
+            font-size: 1.125rem;
+            font-weight: 700;
+            color: #1f2937;
+        }
+        .comparison-card-header .price {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #16a34a;
+            flex-shrink: 0;
+            margin-left: 12px;
+        }
+        .comparison-card-details {
+            font-size: 0.875rem;
+            color: #4b5563;
+            margin-top: 8px;
+        }
+        .comparison-card-details p {
+            margin-bottom: 4px;
+        }
+        .comparison-card-details .phone {
+            color: #1d4ed8;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .comparison-card-actions {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            gap: 8px;
+        }
+        .comparison-card-btn {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            border-radius: 8px;
+            text-align: center;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            cursor: pointer; /* Ensure buttons look clickable */
+            border: none; /* Reset border */
+        }
+        .comparison-card-btn.directions {
+            background-color: #f0fdf4;
+            color: #15803d;
+            border: 1px solid #bbf7d0;
+        }
+        .comparison-card-btn.book {
+            background-color: #16a34a;
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 flex justify-center">
+
+    <div class="w-full max-w-sm h-screen bg-gray-50 flex flex-col relative overflow-hidden">
+
+        <header class="header w-full flex-shrink-0 z-20">
+            <div class="flex items-center">
+                <a href="mandi.html" class="text-white mr-4 back-button p-2"><i class="ph ph-arrow-left text-2xl"></i></a>
+                <h1 id="mandi-title" class="text-xl font-bold">Nearby Locator</h1>
+            </div>
+        </header>
+
+        <main id="mandi-content-area" class="flex-grow overflow-y-auto pb-24 p-4 space-y-4">
+            
+            <div class="card p-4 space-y-2">
+                <label for="crop-search" class="block font-semibold text-gray-700">What crop do you want to sell?</label>
+                <div class="flex gap-2">
+                    <input type="search" id="crop-search" placeholder="Try 'Apple' or 'Potato'" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                    <button id="search-price-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 active:bg-green-800">
+                        <i class="ph ph-magnifying-glass"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-3 gap-3">
+                <button id="filter-mandi" class="map-filter-btn active">
+                    <i class="ph ph-storefront text-green-600"></i>
+                    Mandi (मंडी)
+                </button>
+                <button id="filter-storage" class="map-filter-btn">
+                    <i class="ph ph-warehouse text-blue-600"></i>
+                    Storage (स्टोर)
+                </button>
+                <button id="filter-shops" class="map-filter-btn">
+                    <i class="ph ph-shopping-cart text-yellow-600"></i>
+                    warehouse (गोदाम)
+                </button>
+            </div>
+
+            <div id="location-status" class="text-center p-4 card">
+                <div class="loading-spinner mx-auto mb-2"></div>
+                <p id="location-status-text" class="text-gray-600 font-medium">Checking authentication...</p>
+            </div>
+            
+            <div id="map-container" class="card overflow-hidden" style="border-radius: 16px;">
+                <div id="map"></div>
+            </div>
+
+            <div id="comparison-list-container" class="space-y-3">
+                </div>
+
+        </main>
+
+        <footer class="bottom-nav">
+            <div class="flex justify-around items-center">
+                <a href="index.html" id="home-btn" class="nav-item text-gray-500">
+                    <i class="ph ph-house text-2xl"></i>
+                    <span class="text-xs mt-1">Home</span>
+                </a>
+                <a href="mandi.html" id="live-mandi-nav-btn" class="nav-item text-green-600 active">
+                    <i class="ph ph-storefront text-2xl"></i>
+                    <span class="text-xs mt-1 font-semibold">Live Mandi</span>
+                </a>
+                <a href="my-plots.html" id="my-plots-btn" class="nav-item text-gray-500">
+                    <i class="ph ph-plant text-2xl"></i>
+                    <span class="text-xs mt-1">My Plots</span>
+                </a>
+                <a href="questions.html" class="nav-item text-gray-500">
+                    <i class="ph ph-question text-2xl"></i>
+                    <span class="text-xs mt-1">Questions</span>
+                </a>
+                <a href="menu.html" id="menu-btn" class="nav-item text-gray-500">
+                    <i class="ph ph-user-circle text-2xl"></i>
+                    <span class="text-xs mt-1">Menu</span>
+                </a>
+            </div>
+        </footer>
+
+    </div> 
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        
+        // Firebase config
+        const firebaseConfig = {
+              apiKey: "AIzaSyDg7g1N_Xjz6H-EdvW4CvAnwLiOsHlL5LE",
+              authDomain: "smaart-krishi.firebaseapp.com",
+              projectId: "smaart-krishi",
+              storageBucket: "smaart-krishi.firebasestorage.app",
+              messagingSenderId: "947583038951",
+              appId: "1:947583038951:web:1a75a02ff10ee54fc73942",
+              measurementId: "G-9NSMS22REQ"
+        };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- DOM Elements ---
+        const locationStatus = document.getElementById('location-status');
+        const locationStatusText = document.getElementById('location-status-text');
+        const mapContainer = document.getElementById('map-container');
+        const mapElement = document.getElementById('map');
+        const filterMandiBtn = document.getElementById('filter-mandi');
+        const filterStorageBtn = document.getElementById('filter-storage');
+        const filterShopsBtn = document.getElementById('filter-shops');
+        const searchInput = document.getElementById('crop-search');
+        const searchBtn = document.getElementById('search-price-btn');
+        const listContainer = document.getElementById('comparison-list-container');
+
+        // --- Google Maps Global Variables ---
+        let map;
+        let userMarker;
+        let infoWindow;
+        let allMarkers = [];
+        let userLocation = null; // This will be {lat, lng}
+        
+        // === NEW: Directions Services ===
+        let directionsService;
+        let directionsRenderer;
+        
+        // --- AI Price Cache (from previous page) ---
+        let cachedPrices = {};
+        let cachedCropName = 'Price';
+
+        // --- MOCK DATABASES (to simulate Firestore) ---
+        const MEERUT_COORDS = { lat: 28.9845, lng: 77.7064 };
+
+        const mockLocationDatabase = [
+            { id: 'meerut_mandi', name: 'Meerut Mandi', lat: 28.9780, lng: 77.7120, category: 'mandi', timings: '9:00 AM - 6:00 PM' },
+            { id: 'kithore_mandi', name: 'Kithore Mandi', lat: 28.8850, lng: 77.8960, category: 'mandi', timings: '10:00 AM - 5:00 PM' },
+            { id: 'sardhana_mandi', name: 'Sardhana Mandi', lat: 29.1410, lng: 77.6150, category: 'mandi', timings: '9:30 AM - 5:30 PM' },
+            { id: 'star_storage', name: 'Star Cold Storage', lat: 28.9950, lng: 77.7310, category: 'storage', timings: 'Mon-Sat, 10-5', phone: '+91 98765 43210' },
+            { id: 'jain_warehouse', name: 'Jain Warehouse', lat: 28.9500, lng: 77.6800, category: 'storage', timings: '10:00 AM - 6:00 PM', phone: '+91 91234 56789' },
+            { id: 'kisan_storage', name: 'Kisan Cold Storage', lat: 29.1350, lng: 77.6300, category: 'storage', timings: '24/7 (Seasonal)', phone: '+91 99988 77665' },
+            { id: 'gupta_khad', name: 'Gupta Khad Bhandar', lat: 28.9800, lng: 77.7000, category: 'shop', timings: '8:00 AM - 8:00 PM' },
+            { id: 'punia_seeds', name: 'Punia Seeds', lat: 28.9750, lng: 77.7150, category: 'shop', timings: '9:00 AM - 7:00 PM' },
+            { id: 'tractor_parts', name: 'Tractor Parts Agency', lat: 28.9900, lng: 77.6950, category: 'shop', timings: '10:00 AM - 6:00 PM' },
+        ];
+
+        const mockPriceDatabase = {
+            "apple": { "meerut_mandi": 120, "kithore_mandi": 115, "sardhana_mandi": 122 },
+            "potato": { "meerut_mandi": 20, "kithore_mandi": 22 },
+            "wheat": { "sardhana_mandi": 2400, "meerut_mandi": 2350 }
+        };
+
+        // --- Custom SVG Icons for Google Maps ---
+        const icons = {
+            mandi: { path: 'M10 2c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V8l-6-6H10zm2 10v4h4v-4h-4zm2-8H10v4h4V4z', fillColor: '#16a34a', fillOpacity: 1, strokeWeight: 0, scale: 1.2 },
+            storage: { path: 'M20 8h-3V4H7v4H4c-1.1 0-2 .9-2 2v10h20V10c0-1.1-.9-2-2-2zM9 6h6v2H9V6zm11 12H4v-3h16v3zm0-5H4v-3h16v3z', fillColor: '#2563eb', fillOpacity: 1, strokeWeight: 0, scale: 1 },
+            shop: { path: 'M18 6h-2c0-2.21-1.79-4-4-4S8 3.79 8 6H6c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-6-2c1.1 0 2 .9 2 2h-4c0-1.1.9-2 2-2zm6 16H6V8h2v2c0 .55.45 1 1 1s1-.45 1-1V8h4v2c0 .55.45 1 1 1s1-.45 1-1V8h2v12z', fillColor: '#ca8a04', fillOpacity: 1, strokeWeight: 0, scale: 1 },
+            user: { path: 'M-8 0a8 8 0 1 0 16 0a8 8 0 1 0 -16 0', fillColor: '#3b82f6', fillOpacity: 1, strokeColor: 'white', strokeWeight: 3, scale: 0.8 }
+        };
+
+        // --- === APP LOGIC === ---
+
+        /**
+         * 1. Entry Point: Wait for user to be authenticated
+         */
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                try {
+                    locationStatusText.textContent = "Fetching profile...";
+                    const userDocRef = doc(db, "users", user.uid);
+                    const userDoc = await getDoc(userDocRef);
+                    
+                    if (userDoc.exists()) {
+                        const userData = userDoc.data();
+                        loadGoogleMapsApi(userData.district, userData.state);
+                    } else {
+                        loadGoogleMapsApi(null, null);
+                    }
+                } catch (error) {
+                    console.error("Error fetching user profile:", error);
+                    loadGoogleMapsApi(null, null);
+                }
+            } else {
+                window.location.assign('login.html');
+            }
+        });
+
+
+        /**
+         * 2. Dynamically loads the Google Maps API script
+         */
+        function loadGoogleMapsApi(userDistrict, userState) {
+            // --- !!! API KEY IS HERE !!! ---
+            const GOOGLE_MAPS_API_KEY = "AIzaSyDJPf5bl9yFdlhmytxwVXfJvkZzggftSfQ";
+            // ---------------------------------
+
+            if (window.google && window.google.maps) {
+                initApp(userDistrict, userState);
+                return;
+            }
+
+            window.initApp = () => initApp(userDistrict, userState);
+            
+            const script = document.createElement('script');
+            // === MODIFIED: Added 'directions' library ===
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&callback=initApp&libraries=geocoding,directions`;
+            script.async = true;
+            script.defer = true;
+            document.head.appendChild(script);
+        }
+
+        /**
+         * 3. Initializes the application *after* Google Maps is ready
+         */
+        async function initApp(userDistrict, userState) {
+            console.log("Google Maps API loaded. Initializing map...");
+            
+            loadCachedPrices();
+            
+            map = new google.maps.Map(mapElement, {
+                center: MEERUT_COORDS,
+                zoom: 11,
+                disableDefaultUI: true,
+                zoomControl: true
+            });
+            
+            infoWindow = new google.maps.InfoWindow();
+
+            // === NEW: Initialize Directions Services ===
+            directionsService = new google.maps.DirectionsService();
+            directionsRenderer = new google.maps.DirectionsRenderer();
+            directionsRenderer.setMap(map); // Attach the renderer to your map
+            
+            // === MODIFIED: Info Window Listener for in-app directions ===
+            google.maps.event.addListener(infoWindow, 'domready', () => {
+                // Book button
+                const bookBtn = document.querySelector('.map-popup-btn.book');
+                if (bookBtn) {
+                    bookBtn.addEventListener('click', () => {
+                        const destinationName = bookBtn.dataset.name;
+                        window.location.href = `book-logistics.htm?destination=${encodeURIComponent(destinationName)}`;
+                    });
+                }
+
+                // Directions button
+                const directionsBtn = document.querySelector('.map-popup-btn.directions');
+                if (directionsBtn) {
+                    directionsBtn.addEventListener('click', () => {
+                        const lat = parseFloat(directionsBtn.dataset.lat);
+                        const lng = parseFloat(directionsBtn.dataset.lng);
+                        showDirections(lat, lng);
+                    });
+                }
+            });
+
+            // Add filter button listeners
+            setupMapListeners();
+
+            // Add listener for crop search
+            searchBtn.addEventListener('click', handleCropSearch);
+            // Also search on 'Enter' key
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') handleCropSearch();
+            });
+
+            // 4. Try to get LIVE location
+            if (navigator.geolocation) {
+                locationStatusText.textContent = "Getting your live location...";
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const userCoords = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        onLocationFound(userCoords, "your live location");
+                    },
+                    (error) => {
+                        console.warn(`Live location failed: ${error.message}`);
+                        useProfileLocation(userDistrict, userState);
+                    }
+                );
+            } else {
+                console.warn("Browser does not support geolocation.");
+                useProfileLocation(userDistrict, userState);
+            }
+        }
+
+        /**
+         * 5. (FALLBACK) Try to use profile location
+         */
+        function useProfileLocation(userDistrict, userState) {
+            if (userDistrict && userState) {
+                locationStatusText.textContent = `Geocoding ${userDistrict}...`;
+                try {
+                    const geocoder = new google.maps.Geocoder();
+                    geocoder.geocode({ 'address': `${userDistrict}, ${userState}` }, (results, status) => {
+                        if (status === 'OK' && results[0]) {
+                            const userLocation = results[0].geometry.location;
+                            onLocationFound({ lat: userLocation.lat(), lng: userLocation.lng() }, userDistrict);
+                        } else {
+                            onLocationError("Geocoding failed");
+                        }
+                    });
+                } catch (error) {
+                    onLocationError(error.message);
+                }
+            } else {
+                onLocationError("Profile location missing");
+            }
+        }
+
+        /**
+         * Loads cached prices from localStorage
+         */
+        function loadCachedPrices() {
+            const cachedData = localStorage.getItem('smartKrishiPriceCache');
+            if (cachedData) {
+                const data = JSON.parse(cachedData);
+                cachedPrices = data.prices || {};
+                cachedCropName = data.cropName || 'Price';
+            }
+        }
+        
+        /**
+         * Called when ANY location is found (live or profile)
+         */
+        function onLocationFound(location, locationName) {
+            userLocation = location;
+            locationStatus.innerHTML = `<p class="text-green-700 font-medium">Showing locations near ${locationName}</p>`;
+            
+            if (userMarker) userMarker.setMap(null);
+            userMarker = new google.maps.Marker({
+                position: userLocation,
+                map: map,
+                icon: icons.user,
+                title: 'Your Location'
+            });
+            
+            map.setCenter(userLocation);
+            map.setZoom(12);
+            plotMapPoints(userLocation);
+        }
+
+        /**
+         * FINAL FALLBACK if all location methods fail
+         */
+        function onLocationError(error) {
+            console.warn("Could not get user location:", error);
+            locationStatus.innerHTML = `<p class="text-yellow-700 font-medium">Could not find your location.</p><p class="text-sm text-gray-500">Showing default locations for Meerut.</p>`;
+            userLocation = MEERUT_COORDS;
+            plotMapPoints(MEERUT_COORDS);
+        }
+
+        /**
+         * Plots all the mock data points on the map
+         */
+        function plotMapPoints(referenceCoords) {
+            allMarkers.forEach(marker => marker.setMap(null));
+            allMarkers = [];
+            
+            mockLocationDatabase.forEach(point => {
+                let icon;
+                if (point.category === 'mandi') icon = icons.mandi;
+                else if (point.category === 'storage') icon = icons.storage;
+                else icon = icons.shop;
+                
+                const distance = getDistance(referenceCoords, {lat: point.lat, lng: point.lng});
+                
+                const marker = new google.maps.Marker({
+                    position: { lat: point.lat, lng: point.lng },
+                    map: map,
+                    icon: icon,
+                    title: point.name
+                });
+
+                // Store ALL data on the marker
+                marker.locationData = { ...point, distance: distance };
+
+                const popupHTML = createPopupContent(marker.locationData);
+                
+                marker.addListener('click', () => {
+                    infoWindow.close();
+                    infoWindow.setContent(popupHTML);
+                    infoWindow.open(map, marker);
+                });
+                
+                allMarkers.push(marker);
+            });
+            
+            filterMapMarkers('mandi'); // Show mandis by default
+        }
+
+        /**
+         * AI PRICE INTEGRATION (for map popups)
+         */
+        function createPopupContent(pointData) {
+            let priceHTML = '';
+            if (pointData.category === 'mandi') {
+                const cachedPrice = cachedPrices[pointData.name.toLowerCase()];
+                priceHTML = cachedPrice
+                    ? `<p class="price">Price (${cachedCropName}): ₹${cachedPrice}/kg</p>`
+                    : `<p class="price loading">Price: Visit 'Live Prices' tab first</p>`;
+            } else if (pointData.category === 'storage') {
+                 priceHTML = `<p>Timings: ${pointData.timings || 'N/A'}</p>`;
+            }
+            
+            return `
+                <div class="map-popup-content">
+                    <h3>${pointData.name}</h3>
+                    <p>Distance: ${pointData.distance.toFixed(1)} km away</p>
+                    ${priceHTML}
+                    <div class="map-popup-actions">
+                        <button class="map-popup-btn directions" data-lat="${pointData.lat}" data-lng="${pointData.lng}">Directions</button>
+                        <button class="map-popup-btn book" data-name="${pointData.name}"> Book Truck </button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        /**
+         * Filters markers by category
+         */
+        function filterMapMarkers(category) {
+            // === NEW: Clear any existing directions ===
+            directionsRenderer.setDirections({ routes: [] }); 
+
+            // Deactivate all buttons
+            filterMandiBtn.classList.remove('active');
+            filterStorageBtn.classList.remove('active');
+            filterShopsBtn.classList.remove('active');
+            
+            if (category === 'mandi') filterMandiBtn.classList.add('active');
+            else if (category === 'storage') filterStorageBtn.classList.add('active');
+            else if (category === 'shop') filterShopsBtn.classList.add('active');
+
+            // Show/hide markers
+            allMarkers.forEach(marker => {
+                marker.setVisible(marker.locationData.category === category);
+            });
+
+            // === NEW: Reshow the user marker ===
+            if (userMarker) userMarker.setVisible(true);
+        }
+        
+        function setupMapListeners() {
+            filterMandiBtn.addEventListener('click', () => filterMapMarkers('mandi'));
+            filterStorageBtn.addEventListener('click', () => filterMapMarkers('storage'));
+            filterShopsBtn.addEventListener('click', () => filterMapMarkers('shop'));
+        }
+        
+        /**
+         * Haversine formula
+         */
+        function getDistance(coords1, coords2) {
+            const { lat: lat1, lng: lon1 } = coords1;
+            const { lat: lat2, lng: lon2 } = coords2;
+            const R = 6371; // km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 0.5 - Math.cos(dLat)/2 + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * (1 - Math.cos(dLon))/2;
+            return R * 2 * Math.asin(Math.sqrt(a));
+        }
+
+
+        // --- === --- === --- === --- === --- === --- === ---
+        // --- === NEW FUNCTION: Handle Crop Search (THE CORE) ===
+        // --- === --- === --- === --- === --- === --- === ---
+        
+        function handleCropSearch() {
+            // First, reset the map view from any directions
+            filterMapMarkers(filterMandiBtn.classList.contains('active') ? 'mandi' : (filterStorageBtn.classList.contains('active') ? 'storage' : 'shop'));
+
+            const cropName = searchInput.value.trim().toLowerCase();
+            if (!cropName) {
+                listContainer.innerHTML = `<div class="card p-4 text-center text-red-500"><p>Please enter a crop name.</p></div>`;
+                return;
+            }
+
+            if (!userLocation) {
+                 listContainer.innerHTML = `<div class="card p-4 text-center text-red-500"><p>Still trying to find your location. Please wait.</p></div>`;
+                 return;
+            }
+
+            listContainer.innerHTML = `<div class="card p-4 text-center"><div class="loading-spinner mx-auto mb-2"></div><p>Searching prices for ${cropName}...</p></div>`;
+
+            // 1. Get price data from MOCK database
+            const prices = mockPriceDatabase[cropName];
+
+            if (!prices) {
+                listContainer.innerHTML = `<div class="card p-4 text-center text-gray-600"><p>Sorry, no price data found for '${cropName}'.</p></div>`;
+                return;
+            }
+
+            // 2. Create a list of all locations (mandis + storages)
+            let comparisonResults = [];
+            allMarkers.forEach(marker => {
+                const data = marker.locationData;
+                
+                if (data.category === 'mandi') {
+                    const price = prices[data.id]; // Find price using the location ID
+                    if (price) {
+                        comparisonResults.push({
+                            ...data,
+                            price: price,
+                            unit: (cropName === 'wheat') ? 'quintal' : 'kg'
+                        });
+                    }
+                } else if (data.category === 'storage') {
+                    comparisonResults.push(data);
+                }
+            });
+
+            // 3. Sort the list: Prices first, then by distance
+            comparisonResults.sort((a, b) => {
+                if (a.price && !b.price) return -1;
+                if (!a.price && b.price) return 1;
+                return a.distance - b.distance;
+            });
+
+            // 4. Build the HTML
+            let resultsHTML = '';
+            comparisonResults.forEach(item => {
+                if (item.category === 'mandi') {
+                    resultsHTML += createMandiListCard(item);
+                } else if (item.category === 'storage') {
+                    resultsHTML += createStorageListCard(item);
+                }
+            });
+
+            if (resultsHTML === '') {
+                 resultsHTML = `<div class="card p-4 text-center text-gray-600"><p>No mandis or storages found for your search.</p></div>`;
+            }
+
+            // 5. Display the HTML
+            listContainer.innerHTML = resultsHTML;
+
+            // 6. Add event listeners for the new list buttons
+            document.querySelectorAll('.comparison-card').forEach(card => {
+                const bookBtn = card.querySelector('.comparison-card-btn.book');
+                const directionsBtn = card.querySelector('.comparison-card-btn.directions');
+                
+                if (bookBtn) {
+                    bookBtn.addEventListener('click', (e) => {
+                        const destinationName = e.currentTarget.dataset.name;
+                        window.location.href = `book-logistics.htm?destination=${encodeURIComponent(destinationName)}`;
+                    });
+                }
+                
+                if (directionsBtn) {
+                    directionsBtn.addEventListener('click', (e) => {
+                        const lat = parseFloat(e.currentTarget.dataset.lat);
+                        const lng = parseFloat(e.currentTarget.dataset.lng);
+                        showDirections(lat, lng);
+                    });
+                }
+            });
+        }
+
+
+        // --- === NEW: Helper functions to create list cards === ---
+        
+        function createMandiListCard(item) {
+            return `
+                <div class="comparison-card">
+                    <div class="comparison-card-header">
+                        <div>
+                            <h3 class="text-green-800">${item.name}</h3>
+                            <p class="text-sm font-semibold text-gray-600">${item.distance.toFixed(1)} km away</p>
+                        </div>
+                        <p class="price">₹${item.price}<span class="text-lg">/${item.unit}</span></p>
+                    </div>
+                    <div class="comparison-card-details">
+                        <p><strong>Timings:</strong> ${item.timings || 'Not available'}</p>
+                    </div>
+                    <div class="comparison-card-actions">
+                        <button class="comparison-card-btn directions" data-lat="${item.lat}" data-lng="${item.lng}">
+                            <i class="ph ph-map-trifold"></i> Directions
+                        </button>
+                        <button class="comparison-card-btn book" data-name="${item.name}">
+                            <i class="ph ph-truck"></i> Book Truck
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function createStorageListCard(item) {
+            return `
+                <div class="comparison-card storage">
+                    <div class="comparison-card-header">
+                        <div>
+                            <h3 class="text-blue-800">${item.name}</h3>
+                            <p class="text-sm font-semibold text-gray-600">${item.distance.toFixed(1)} km away</p>
+                        </div>
+                    </div>
+                    <div class="comparison-card-details">
+                        <p><strong>Timings:</strong> ${item.timings || 'Not available'}</p>
+                        ${item.phone ? `<p><strong>Contact:</strong> <a href="tel:${item.phone}" class="phone">${item.phone}</a></p>` : ''}
+                    </div>
+                    <div class="comparison-card-actions">
+                        <button class="comparison-card-btn directions" data-lat="${item.lat}" data-lng="${item.lng}">
+                            <i class="ph ph-map-trifold"></i> Directions
+                        </button>
+                        <button class="comparison-card-btn book" data-name="${item.name}">
+                            <i class="ph ph-truck"></i> Book Truck
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // === --- === --- === --- === --- === --- === ---
+        // === NEW FUNCTION: Show Directions (IN-APP) ===
+        // === --- === --- === --- === --- === --- === ---
+        function showDirections(destinationLat, destinationLng) {
+            if (!userLocation) {
+                alert("Cannot show directions: Your location is not available.");
+                return;
+            }
+
+            // Show a simple loading indicator in the list
+            listContainer.innerHTML = `<div class="card p-4 text-center"><div class="loading-spinner mx-auto mb-2"></div><p>Calculating route...</p></div>`;
+
+            const request = {
+                origin: userLocation, // Your {lat, lng} object
+                destination: { lat: destinationLat, lng: destinationLng },
+                travelMode: 'DRIVING'
+            };
+
+            directionsService.route(request, (response, status) => {
+                if (status === 'OK') {
+                    // 1. Hide the regular markers and info window
+                    infoWindow.close();
+                    allMarkers.forEach(marker => marker.setVisible(false));
+                    if (userMarker) userMarker.setVisible(false);
+                    
+                    // 2. Display the route on the map
+                    directionsRenderer.setDirections(response);
+                    
+                    // 3. Clear the list container
+                    listContainer.innerHTML = '';
+
+                    // 4. Scroll to the map
+                    mapContainer.scrollIntoView({ behavior: 'smooth' });
+                    
+                } else {
+                    alert('Directions request failed: ' + status);
+                    // Restore the search (or just clear the loading)
+                    handleCropSearch(); // Re-run the search to restore the list
+                }
+            });
+        }
+
+        // --- Start the app by authenticating first ---
+        // onAuthStateChanged at the top of the script will handle starting the app.
+
+    </script>
+</body>
+</html>

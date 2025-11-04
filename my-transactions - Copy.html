@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Transactions - SmartKrishi</title>
+    <!-- Tailwind CSS --><script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons --><script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Firebase Libraries -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js" type="module"></script>
+    <style>
+        /* Loading spinner */
+        .loading-spinner-dark {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(22, 163, 74, 0.2);
+            border-top: 4px solid #16a34a;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100 flex justify-center">
+
+    <!-- Mobile Screen Container -->
+    <div class="w-full max-w-sm h-screen bg-gray-100 flex flex-col relative overflow-hidden">
+        
+        <!-- Top Navbar -->
+        <nav class="bg-white shadow-sm w-full flex-shrink-0 z-10">
+            <div class="px-4 py-3 flex items-center">
+                <a href="menu.html" class="text-gray-600 mr-4 p-1 rounded-full hover:bg-gray-100">
+                    <i class="ph ph-arrow-left text-2xl"></i>
+                </a>
+                <h1 class="text-xl font-bold text-green-700">My Transactions</h1>
+            </div>
+        </nav>
+
+        <!-- Main Content Area (Scrollable) -->
+        <main class="flex-grow overflow-y-auto pb-20 p-4">
+
+            <!-- Loading State -->
+            <div id="loading-state" class="text-center p-10">
+                <div class="loading-spinner-dark mx-auto"></div>
+                <p class="text-gray-500 mt-2">Loading transactions...</p>
+            </div>
+
+            <!-- Content (hidden by default) -->
+            <div id="transactions-content" class="hidden space-y-4">
+                
+                <!-- Summary Card -->
+                <div class="bg-white p-4 rounded-xl shadow-sm">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-3">Financial Summary</h2>
+                    <div class="grid grid-cols-3 gap-2 text-center">
+                        <div>
+                            <span class="text-xs text-gray-500">Total Income</span>
+                            <p id="summary-income" class="font-semibold text-green-700 text-lg">₹0</p>
+                        </div>
+                        <div>
+                            <span class="text-xs text-gray-500">Total Expense</span>
+                            <p id="summary-expense" class="font-semibold text-red-700 text-lg">₹0</p>
+                        </div>
+                        <div>
+                            <span class="text-xs text-gray-500">Net Profit</span>
+                            <p id="summary-net" class="font-semibold text-blue-700 text-lg">₹0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Transaction List -->
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-800 mb-2 px-1">Recent History</h2>
+                    
+                    <div id="empty-state" class="hidden text-center p-10">
+                        <i class="ph ph-receipt text-6xl text-gray-400 mx-auto"></i>
+                        <h3 class="text-lg font-semibold text-gray-700 mt-4">No Transactions Yet</h3>
+                        <p class="text-gray-500">Your income from harvests and activity costs will appear here.</p>
+                    </div>
+
+                    <div id="transaction-list" class="space-y-2">
+                        <!-- Transaction items will be injected here by JS -->
+                    </div>
+                </div>
+            </div>
+
+        </main>
+        
+        <!-- Bottom Navigation (so user isn't trapped) -->
+        <footer class="bg-white border-t border-gray-200 w-full p-2 flex justify-around items-center absolute bottom-0 z-10">
+             <a href="index.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-house text-2xl"></i><span class="text-xs">Home</span>
+            </a>
+            <a href="mandi.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-storefront text-2xl"></i><span class="text-xs">Live Mandi</span>
+            </a>
+            <a href="my-plots.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-plant text-2xl"></i><span class="text-xs">My Plots</span>
+            </a>
+            <a href="questions.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-question text-2xl"></i><span class="text-xs">Questions</span>
+            </a>
+            <a href="menu.html" class="flex flex-col items-center text-green-600 p-1 rounded-md transition-colors bottom-nav-item active">
+                <i class="ph ph-user-circle text-2xl"></i><span class="text-xs font-semibold">Menu</span>
+            </a>
+        </footer>
+    </div>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, query, onSnapshot, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDg7g1N_Xjz6H-EdvW4CvAnwLiOsHlL5LE",
+            authDomain: "smaart-krishi.firebaseapp.com",
+            projectId: "smaart-krishi",
+            storageBucket: "smaart-krishi.firebasestorage.app",
+            messagingSenderId: "947583038951",
+            appId: "1:947583038951:web:1a75a02ff10ee54fc73942",
+            measurementId: "G-9NSMS22REQ"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- DOM Elements ---
+        const loadingState = document.getElementById('loading-state');
+        const transactionsContent = document.getElementById('transactions-content');
+        const emptyState = document.getElementById('empty-state');
+        const transactionList = document.getElementById('transaction-list');
+        
+        // Summary Card Elements
+        const summaryIncome = document.getElementById('summary-income');
+        const summaryExpense = document.getElementById('summary-expense');
+        const summaryNet = document.getElementById('summary-net');
+
+        let currentUser = null;
+        let transactionsUnsubscribe = null;
+
+        // --- Auth Check ---
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                loadTransactions(user.uid);
+            } else {
+                window.location.assign('login.html');
+            }
+        });
+
+        // --- Load Transactions ---
+        function loadTransactions(userId) {
+            if (transactionsUnsubscribe) transactionsUnsubscribe();
+
+            const transRef = collection(db, "users", userId, "transactions");
+            // Order by date, newest first
+            const q = query(transRef, orderBy("date", "desc"));
+
+            transactionsUnsubscribe = onSnapshot(q, (snapshot) => {
+                loadingState.classList.add('hidden');
+                transactionsContent.classList.remove('hidden');
+                
+                transactionList.innerHTML = ''; // Clear old list
+                
+                let totalIncome = 0;
+                let totalExpense = 0;
+
+                if (snapshot.empty) {
+                    emptyState.classList.remove('hidden');
+                } else {
+                    emptyState.classList.add('hidden');
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        
+                        // Update summaries
+                        if (data.type === 'income') {
+                            totalIncome += data.amount;
+                        } else if (data.type === 'expense') {
+                            totalExpense += data.amount;
+                        }
+
+                        // Create and append card
+                        const card = createTransactionCard(data);
+                        transactionList.appendChild(card);
+                    });
+                }
+                
+                // Update summary card
+                const netProfit = totalIncome - totalExpense;
+                summaryIncome.textContent = `₹${totalIncome.toLocaleString('en-IN')}`;
+                summaryExpense.textContent = `₹${totalExpense.toLocaleString('en-IN')}`;
+                summaryNet.textContent = `₹${netProfit.toLocaleString('en-IN')}`;
+                
+                if (netProfit < 0) {
+                    summaryNet.classList.remove('text-blue-700', 'text-green-700');
+                    summaryNet.classList.add('text-red-700');
+                } else {
+                    summaryNet.classList.remove('text-red-700');
+                    summaryNet.classList.add('text-blue-700');
+                }
+
+            }, (error) => {
+                console.error("Error loading transactions: ", error);
+                loadingState.textContent = "Error loading data.";
+            });
+        }
+
+        // --- Create Transaction Card UI ---
+        function createTransactionCard(data) {
+            const card = document.createElement('div');
+            card.className = "bg-white p-3 rounded-lg shadow-sm flex items-center space-x-3";
+            
+            const isIncome = data.type === 'income';
+            const iconClass = isIncome ? 'ph-arrow-up-right bg-green-100 text-green-600' : 'ph-arrow-down-left bg-red-100 text-red-600';
+            const amountClass = isIncome ? 'text-green-600' : 'text-red-600';
+            const amountPrefix = isIncome ? '+ ' : '- ';
+
+            card.innerHTML = `
+                <div class="p-2 rounded-full ${iconClass}">
+                    <i class="ph ${isIncome ? 'ph-arrow-up-right' : 'ph-arrow-down-left'} text-xl"></i>
+                </div>
+                <div class="flex-grow">
+                    <p class="font-medium text-gray-800">${data.description}</p>
+                    <p class="text-sm text-gray-500">${data.plotName} • ${data.date.toDate().toLocaleDateString()}</p>
+                </div>
+                <span class="font-bold text-lg ${amountClass}">
+                    ${amountPrefix}₹${data.amount.toLocaleString('en-IN')}
+                </span>
+            `;
+            return card;
+        }
+
+    </script>
+</body>
+</html>

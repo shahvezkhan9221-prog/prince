@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Listing - SmartKrishi</title>
+    <!-- Tailwind CSS --><script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons --><script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Firebase Libraries -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js" type="module"></script>
+    <style>
+        .loading-spinner-dark {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(22, 163, 74, 0.2);
+            border-top: 4px solid #16a34a;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100 flex justify-center">
+
+    <!-- Mobile Screen Container -->
+    <div class="w-full max-w-sm h-screen bg-gray-100 flex flex-col relative overflow-hidden">
+        
+        <!-- Top Navbar -->
+        <nav class="bg-white shadow-sm w-full flex-shrink-0 z-10">
+            <div class="px-4 py-3 flex items-center justify-between">
+                <a href="mandi.html" class="text-gray-600 p-1 rounded-full hover:bg-gray-100">
+                    <i class="ph ph-arrow-left text-2xl"></i>
+                </a>
+                <h1 class="text-xl font-bold text-green-700">Create New Listing</h1>
+                <button type="submit" form="listing-form" id="submit-listing-btn" class="font-semibold text-green-600 hover:bg-green-50 p-2 rounded-lg">
+                    Post
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main Content Area (Scrollable) -->
+        <main class="flex-grow overflow-y-auto pb-20 p-4">
+
+            <!-- Loading State -->
+            <div id="loading-state" class="text-center p-10">
+                <div class="loading-spinner-dark mx-auto"></div>
+                <p class="text-gray-500 mt-2">Loading...</p>
+            </div>
+
+            <!-- Listing Form (hidden by default) -->
+            <form id="listing-form" class="hidden space-y-4">
+                
+                <!-- Image Upload -->
+                <div class="bg-white p-4 rounded-xl shadow-sm">
+                    <label for="image-upload" class="cursor-pointer border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center text-center hover:bg-gray-50">
+                        <img id="image-preview" src="#" alt="Preview" class="hidden w-full h-32 object-cover rounded-lg mb-2">
+                        <i id="image-icon" class="ph ph-image text-4xl text-gray-400 mb-2"></i>
+                        <span id="image-text" class="text-sm font-medium text-gray-600">Upload Produce Photo</span>
+                    </label>
+                    <input type="file" id="image-upload" accept="image/*" class="hidden">
+                </div>
+                
+                <!-- Details Form -->
+                <div class="bg-white p-4 rounded-xl shadow-sm space-y-4">
+                    <div>
+                        <label for="cropName" class="block mb-1 text-sm font-medium text-gray-700">Crop Name</label>
+                        <input type="text" id="cropName" class="w-full p-3 border border-gray-300 rounded-md" placeholder="e.g., Wheat (HD-2967)" required>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label for="quantity" class="block mb-1 text-sm font-medium text-gray-700">Quantity</label>
+                            <input type="number" id="quantity" class="w-full p-3 border border-gray-300 rounded-md" placeholder="50" required>
+                        </div>
+                        <div>
+                            <label for="quantityUnit" class="block mb-1 text-sm font-medium text-gray-700">Unit</label>
+                            <select id="quantityUnit" class="w-full p-3 border border-gray-300 rounded-md bg-white" required>
+                                <option>Quintal</option>
+                                <option>Kg</option>
+                                <option>Ton</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label for="price" class="block mb-1 text-sm font-medium text-gray-700">Price (₹)</label>
+                            <input type="number" id="price" class="w-full p-3 border border-gray-300 rounded-md" placeholder="2200" required>
+                        </div>
+                        <div>
+                            <label for="priceUnit" class="block mb-1 text-sm font-medium text-gray-700">Per</label>
+                            <select id="priceUnit" class="w-full p-3 border border-gray-300 rounded-md bg-white" required>
+                                <option>Quintal</option>
+                                <option>Kg</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="location" class="block mb-1 text-sm font-medium text-gray-700">Pickup Location</label>
+                        <input type="text" id="location" class="w-full p-3 border border-gray-300 rounded-md bg-gray-100" placeholder="Your location" readonly>
+                        <p class="text-xs text-gray-500 mt-1">This is set from your profile (District, State).</p>
+                    </div>
+                </div>
+                
+                <!-- Upload Progress -->
+                <div id="upload-progress-bar" class="hidden w-full bg-gray-200 rounded-full h-2.5">
+                    <div class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                </div>
+            </form>
+
+        </main>
+    </div>
+    
+    <!-- Simple Alert Modal -->
+    <div id="alert-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-center">
+            <h3 id="alert-title" class="text-lg font-semibold text-gray-800 mb-4">Alert</h3>
+            <p id="alert-message" class="text-gray-600 mb-6">This is an alert message.</p>
+            <button id="alert-close-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition">OK</button>
+        </div>
+    </div>
+
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDg7g1N_Xjz6H-EdvW4CvAnwLiOsHlL5LE",
+            authDomain: "smaart-krishi.firebaseapp.com",
+            projectId: "smaart-krishi",
+            storageBucket: "smaart-krishi.firebasestorage.app",
+            messagingSenderId: "947583038951",
+            appId: "1:947583038951:web:1a75a02ff10ee54fc73942",
+            measurementId: "G-9NSMS22REQ"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+
+        // --- DOM Elements ---
+        const loadingState = document.getElementById('loading-state');
+        const listingForm = document.getElementById('listing-form');
+        const submitListingBtn = document.getElementById('submit-listing-btn');
+        const locationInput = document.getElementById('location');
+        const imageUpload = document.getElementById('image-upload');
+        const imagePreview = document.getElementById('image-preview');
+        const imageIcon = document.getElementById('image-icon');
+        const imageText = document.getElementById('image-text');
+        const progressBar = document.getElementById('upload-progress-bar');
+        
+        // Modal Elements
+        const alertModal = document.getElementById('alert-modal');
+        const alertTitle = document.getElementById('alert-title');
+        const alertMessage = document.getElementById('alert-message');
+        const alertCloseBtn = document.getElementById('alert-close-btn');
+
+        let currentUser = null;
+        let userData = null;
+        let imageFile = null;
+
+        // --- Auth Check ---
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                loadUserData(user.uid);
+            } else {
+                window.location.assign('login.html');
+            }
+        });
+
+        // --- Load User Data ---
+        async function loadUserData(userId) {
+            try {
+                const userDocRef = doc(db, "users", userId);
+                const userDoc = await getDoc(userDocRef);
+                
+                if (userDoc.exists()) {
+                    userData = userDoc.data();
+                    locationInput.value = `${userData.district || 'Unknown'}, ${userData.state || 'India'}`;
+                } else {
+                    throw new Error("User profile not found.");
+                }
+            } catch (error) {
+                console.error("Error loading user data: ", error);
+                showAlert("Error", "Could not load your profile. Please complete your profile first.");
+                submitListingBtn.disabled = true;
+            } finally {
+                loadingState.classList.add('hidden');
+                listingForm.classList.remove('hidden');
+            }
+        }
+
+        // --- Image Preview ---
+        imageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                imageFile = file;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    imagePreview.src = event.target.result;
+                    imagePreview.classList.remove('hidden');
+                    imageIcon.classList.add('hidden');
+                    imageText.textContent = "Click to change photo";
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // --- Handle Form Submission ---
+        listingForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentUser || !userData || !imageFile) {
+                showAlert("Missing Info", "Please fill all fields and upload a photo.");
+                return;
+            }
+
+            submitListingBtn.disabled = true;
+            submitListingBtn.textContent = "Posting...";
+            progressBar.classList.remove('hidden');
+
+            try {
+                // 1. Upload Image
+                const storageRef = ref(storage, `b2b-listings/${currentUser.uid}/${Date.now()}_${imageFile.name}`);
+                const uploadTask = uploadBytesResumable(storageRef, imageFile);
+
+                const downloadURL = await new Promise((resolve, reject) => {
+                    uploadTask.on('state_changed', 
+                        (snapshot) => {
+                            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                            progressBar.firstElementChild.style.width = `${progress}%`;
+                        }, 
+                        (error) => reject(error), 
+                        async () => {
+                            const url = await getDownloadURL(uploadTask.snapshot.ref);
+                            resolve(url);
+                        }
+                    );
+                });
+
+                // 2. Prepare Listing Data
+                const listingData = {
+                    sellerId: currentUser.uid,
+                    sellerName: userData.name || "Farmer",
+                    sellerProfilePic: userData.profilePicture || null,
+                    location: locationInput.value,
+                    
+                    cropName: document.getElementById('cropName').value,
+                    quantity: parseFloat(document.getElementById('quantity').value),
+                    quantityUnit: document.getElementById('quantityUnit').value,
+                    price: parseFloat(document.getElementById('price').value),
+                    priceUnit: document.getElementById('priceUnit').value,
+                    
+                    imageUrl: downloadURL,
+                    status: "Active", // "Active", "Sold", "Cancelled"
+                    createdAt: serverTimestamp()
+                };
+                
+                // 3. Save to Firestore
+                // We save to a main 'b2b-listings' collection so everyone can see it
+                const listingsRef = collection(db, "b2b-listings");
+                await addDoc(listingsRef, listingData);
+                
+                showAlert("Success", "Your listing is now live!");
+                
+                // Redirect to the "My Listings" page
+                setTimeout(() => {
+                    window.location.assign('my-listings.html');
+                }, 1500);
+
+            } catch (error) {
+                console.error("Error creating listing: ", error);
+                showAlert("Error", "Could not create listing. Please try again.");
+                submitListingBtn.disabled = false;
+                submitListingBtn.textContent = "Post";
+                progressBar.classList.add('hidden');
+            }
+        });
+
+        // --- Custom Alert Modal Functions ---
+        function showAlert(title, message) {
+            alertTitle.textContent = title;
+            alertMessage.textContent = message;
+            alertModal.classList.remove('hidden');
+        }
+
+        alertCloseBtn.addEventListener('click', () => {
+            alertModal.classList.add('hidden');
+        });
+    </script>
+</body>
+</html>

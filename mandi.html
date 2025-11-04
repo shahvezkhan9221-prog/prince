@@ -1,0 +1,1429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartKrishi - Mandi Services</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js" type="module"></script>
+    <style>
+        /* Add minor style for chart responsiveness */
+        .chart-container {
+            position: relative;
+            height: 250px; /* Adjust height as needed */
+            width: 100%;
+        }
+        /* Style for adding space between market groups */
+        .market-group-start td {
+            padding-top: 0.75rem !important; /* Add padding-top */
+            border-top: 2px solid #e5e7eb !important; /* Add a top border */
+        }
+        /* Enhanced UI styles */
+        .menu-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        .crop-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .active-section {
+            background-color: #dcfce7;
+            border-left: 4px solid #16a34a;
+        }
+        .chart-timespan-btn.active {
+            background-color: #16a34a;
+            color: white;
+        }
+        .price-card {
+            transition: all 0.3s ease;
+        }
+        .price-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .back-button {
+            transition: all 0.2s ease;
+        }
+        .back-button:hover {
+            background-color: #f3f4f6;
+            border-radius: 50%;
+        }
+        .section-title {
+            position: relative;
+            padding-bottom: 10px;
+        }
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 50px;
+            height: 3px;
+            background-color: #16a34a;
+            border-radius: 3px;
+        }
+        .search-container {
+            position: relative;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .search-container input {
+            border: none;
+            box-shadow: none;
+        }
+        .search-container input:focus {
+            box-shadow: none;
+        }
+        .mic-button {
+            transition: all 0.3s ease;
+        }
+        .mic-button.listening {
+            color: #3b82f6;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .loading-spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(22, 163, 74, 0.2);
+            border-top: 3px solid #16a34a;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .empty-state i {
+            font-size: 48px;
+            color: #9ca3af;
+            margin-bottom: 16px;
+        }
+        .empty-state p {
+            color: #6b7280;
+        }
+        .bottom-nav-item.active {
+            color: #16a34a;
+        }
+        .bottom-nav-item.active i {
+            background-color: #dcfce7;
+            padding: 8px;
+            border-radius: 50%;
+        }
+        /* Ensure sections are properly hidden/shown */
+        .hidden {
+            display: none !important;
+        }
+        /* Enhanced card styles */
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            transition: all 0.3s ease;
+        }
+        .card:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        /* Enhanced button styles */
+        .btn-primary {
+            background: linear-gradient(135deg, #16a34a, #15803d);
+            color: white;
+            border-radius: 12px;
+            padding: 12px 24px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.2);
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #15803d, #166534);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(22, 163, 74, 0.3);
+        }
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #4b5563;
+            border-radius: 12px;
+            padding: 12px 24px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn-secondary:hover {
+            background: #e5e7eb;
+            transform: translateY(-2px);
+        }
+        /* Enhanced table styles */
+        .price-table th {
+            background-color: #f9fafb;
+            font-weight: 600;
+            color: #6b7280;
+            padding: 12px 16px;
+        }
+        .price-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .price-table tr:last-child td {
+            border-bottom: none;
+        }
+        .price-table tr:hover {
+            background-color: #f0fdf4;
+        }
+        /* Enhanced market card */
+        .market-card {
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .market-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        /* Enhanced service card */
+        .service-card {
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            background: white;
+        }
+        .service-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        /* Enhanced timespan buttons */
+        .timespan-btn {
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        .timespan-btn.active {
+            background: #16a34a;
+            color: white;
+        }
+        /* Enhanced crop grid */
+        .crop-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+        .crop-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 16px 8px;
+            border-radius: 12px;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+        .crop-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        /* Enhanced bottom navigation */
+        .bottom-nav {
+            background: white;
+            border-top: 1px solid #e5e7eb;
+            padding: 12px 0;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            max-width: 400px;
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 0;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+        .nav-item.active {
+            color: #16a34a;
+        }
+        .nav-item.active i {
+            background-color: #dcfce7;
+            padding: 8px;
+            border-radius: 50%;
+        }
+        
+        /* --- MODIFIED HEADER --- */
+        .header {
+            background: linear-gradient(135deg, #16a34a, #15803d);
+            color: white;
+            padding: 12px 16px; 
+            border-radius: 0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
+        }
+        .header h1 {
+            font-weight: 600; 
+            font-size: 1.25rem; 
+        }
+        /* --- END OF MODIFIED HEADER --- */
+
+        /* Enhanced section spacing */
+        .section {
+            margin-bottom: 24px;
+        }
+        /* Enhanced loading state */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 16px;
+            z-index: 10;
+        }
+        
+        /* --- NEW CSS FOR MODAL --- */
+        .modal-btn {
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 flex justify-center">
+
+    <div class="w-full max-w-sm h-screen bg-gray-50 flex flex-col relative overflow-hidden">
+
+        <header class="header w-full flex-shrink-0 z-20">
+            <div class="flex items-center">
+                <button id="mandi-back-btn" class="text-white mr-4 hidden back-button p-2"><i class="ph ph-arrow-left text-2xl"></i></button>
+                <a href="index.html" id="mandi-home-link" class="text-white mr-4 back-button p-2"><i class="ph ph-arrow-left text-2xl"></i></a>
+                <h1 id="mandi-title" class="text-xl font-bold">Mandi Services</h1>
+                <div class="ml-auto">
+                    <i class="ph ph-bell text-xl"></i>
+                </div>
+            </div>
+        </header>
+
+        <main id="mandi-content-area" class="flex-grow overflow-y-auto p-4 pb-24 mt-4">
+
+            <section id="mandi-menu" class="space-y-5">
+                <p class="text-gray-600 mb-4 text-center">Explore market prices, find buyers, and manage your farm logistics.</p>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <button data-section="live-prices" class="mandi-menu-item flex flex-col items-center bg-white p-5 rounded-xl shadow-sm w-full transition-all active:scale-95 menu-item">
+                        <div class="p-3 bg-green-100 rounded-lg mb-3"><i class="ph ph-line-chart-up text-3xl text-green-700"></i></div>
+                        <h2 class="text-lg font-semibold text-gray-800 mb-1">Live Mandi Prices</h2>
+                        <p class="text-gray-500 text-xs text-center">Check prices by crop and location</p>
+                    </button>
+                    
+                    <button data-section="nearby-locator" class="mandi-menu-item flex flex-col items-center bg-white p-5 rounded-xl shadow-sm w-full transition-all active:scale-95 menu-item">
+                        <div class="p-3 bg-blue-100 rounded-lg mb-3"><i class="ph ph-map-pin text-3xl text-blue-700"></i></div>
+                        <h2 class="text-lg font-semibold text-gray-800 mb-1">Nearby Locator</h2>
+                        <p class="text-gray-500 text-xs text-center">Find mandis, warehouses & cold storage</p>
+                    </button>
+                    
+                    <button data-section="b2b-market" class="mandi-menu-item flex flex-col items-center bg-white p-5 rounded-xl shadow-sm w-full transition-all active:scale-95 menu-item">
+                        <div class="p-3 bg-yellow-100 rounded-lg mb-3"><i class="ph ph-handshake text-3xl text-yellow-700"></i></div>
+                        <h2 class="text-lg font-semibold text-gray-800 mb-1">B2B Marketplace</h2>
+                        <p class="text-gray-500 text-xs text-center">Sell directly to bulk buyers</p>
+                    </button>
+                    
+                    <button data-section="logistics" class="mandi-menu-item flex flex-col items-center bg-white p-5 rounded-xl shadow-sm w-full transition-all active:scale-95 menu-item">
+                        <div class="p-3 bg-purple-100 rounded-lg mb-3"><i class="ph ph-truck text-3xl text-purple-700"></i></div>
+                        <h2 class="text-lg font-semibold text-gray-800 mb-1">Mandi on Wheels</h2>
+                        <p class="text-gray-500 text-xs text-center">Book trucks and tractors for transport</p>
+                    </button>
+
+                    <button id="book-drone-btn" class="mandi-menu-item flex flex-col items-center bg-white p-5 rounded-xl shadow-sm w-full transition-all active:scale-95 menu-item">
+                        <div class="p-3 bg-cyan-100 rounded-lg mb-3"><i class="ph ph-wind text-3xl text-cyan-700"></i></div>
+                        <h2 class="text-lg font-semibold text-gray-800 mb-1">Book Drone Spray</h2>
+                        <p class="text-gray-500 text-xs text-center">Schedule an aerial spray for your crops</p>
+                    </button>
+                </div>
+            </section>
+
+            <section id="live-prices-content" class="mandi-section hidden space-y-4">
+                <div class="card p-4">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold text-gray-800 section-title">Live Mandi Prices</h2>
+                        <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Live</span>
+                    </div>
+                    
+                    <div class="bg-gray-50 rounded-xl p-3 mb-4">
+                        <div class="flex items-center justify-between">
+                            <p class="text-sm text-gray-600 flex items-center">
+                                <i class="ph ph-map-pin mr-1 text-green-600"></i>
+                                Location: <span id="user-location-prices" class="font-medium ml-1">Loading...</span>
+                            </p>
+                            <button id="change-location-btn" class="text-sm text-green-700 font-medium hover:underline focus:outline-none">Change</button>
+                        </div>
+                    </div>
+                    <div class="search-container mb-4">
+                        <input type="search" id="crop-search-input" placeholder="Enter crop name (e.g., Wheat) or use mic" class="w-full p-4 pl-12 pr-12 border border-gray-300 rounded-xl focus:ring-green-500 focus:border-green-500">
+                        <i class="ph ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                        <button type="button" id="crop-search-mic-btn" class="mic-button absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-blue-600">
+                            <i class="ph ph-microphone text-2xl"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card p-4">
+                    <h3 class="text-md font-semibold text-gray-700 mb-3">Popular Crops</h3>
+                    <div id="vegetable-grid" class="crop-grid">
+                        </div>
+                </div>
+
+                <div id="price-results-area" class="hidden space-y-4">
+                        <div class="price-card card p-4 relative">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-md font-semibold text-gray-800">Today's Prices for <span id="selected-crop-name" class="text-green-700"></span>:</h3>
+                            <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Live</span>
+                        </div>
+                        <div class="min-h-[100px] relative">
+                            <div id="mandi-loading" class="text-center py-6 hidden">
+                                <div class="loading-spinner mx-auto mb-3"></div>
+                                <p class="text-gray-500">Fetching latest data...</p>
+                            </div>
+                            <div id="mandi-error" class="text-center py-6 text-red-500 hidden">
+                                <i class="ph ph-warning text-3xl mb-2"></i>
+                                <p>Error loading data</p>
+                            </div>
+                            <div id="mandi-crop-price-results" class="overflow-x-auto">
+                                    </div>
+                            <div id="mandi-crop-price-sources" class="mt-4 text-xs text-gray-500 border-t pt-3"></div>
+                        </div>
+                    </div>
+
+                    <div id="historical-chart-card" class="price-card card p-4 hidden">
+                         <div class="flex justify-between items-center mb-3">
+                             <h3 class="text-md font-semibold text-gray-800">Price Trend (<span id="chart-mandi-name">Specific Mandi</span>):</h3>
+                             <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">History</span>
+                         </div>
+                         <div class="flex justify-center space-x-2 mb-4">
+                             <button data-days="7" class="timespan-btn bg-gray-200 text-gray-700 px-3 py-1 text-sm font-medium hover:bg-green-100">7 Days</button>
+                             <button data-days="30" class="timespan-btn bg-green-600 text-white px-3 py-1 text-sm font-medium active">30 Days</button>
+                             <button data-days="90" class="timespan-btn bg-gray-200 text-gray-700 px-3 py-1 text-sm font-medium hover:bg-green-100">90 Days</button>
+                         </div>
+                         <div id="chart-loading" class="text-center py-6 hidden">
+                            <div class="loading-spinner mx-auto mb-3"></div>
+                            <p class="text-gray-500">Loading trend data...</p>
+                         </div>
+                         <div id="chart-error" class="text-center py-6 text-red-500 hidden">
+                            <i class="ph ph-warning text-3xl mb-2"></i>
+                            <p>Error loading chart</p>
+                         </div>
+                         <div class="chart-container">
+                             <canvas id="priceChart"></canvas>
+                         </div>
+                    </div>
+                </div>
+            </section>
+<section id="nearby-locator-content" class="mandi-section hidden">
+    <div class="card p-5 mb-4">
+        <div class="text-center mb-4">
+            <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <i class="ph ph-map-pin text-3xl text-blue-500"></i>
+            </div>
+            <h2 class="text-lg font-semibold text-gray-800 mb-2 section-title">Nearby Locator</h2>
+            <p class="text-gray-600 mb-4">Locate nearby mandis, warehouses, and cold storage facilities</p>
+            
+            <a href="nearby-locator.html" class="btn-primary w-full">Enable Location</a>
+            
+        </div>
+    </div>
+                
+                <div class="card p-4">
+                    <h3 class="font-semibold text-gray-800 mb-3">Nearby Services</h3>
+                    <div class="space-y-3">
+                        <div class="market-card flex items-center p-3 border border-gray-200 rounded-lg">
+                            <div class="bg-blue-100 p-2 rounded-lg mr-3">
+                                <i class="ph ph-storefront text-blue-600 text-xl"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h4 class="font-medium">District Mandi</h4>
+                                <p class="text-sm text-gray-600">2.5 km away</p>
+                            </div>
+                            <i class="ph ph-caret-right text-gray-400"></i>
+                        </div>
+                        <div class="market-card flex items-center p-3 border border-gray-200 rounded-lg">
+                            <div class="bg-purple-100 p-2 rounded-lg mr-3">
+                                <i class="ph ph-warehouse text-purple-600 text-xl"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h4 class="font-medium">Krishi Storage</h4>
+                                <p class="text-sm text-gray-600">4.2 km away</p>
+                            </div>
+                            <i class="ph ph-caret-right text-gray-400"></i>
+                        </div>
+                        <div class="market-card flex items-center p-3 border border-gray-200 rounded-lg">
+                            <div class="bg-green-100 p-2 rounded-lg mr-3">
+                                <i class="ph ph-snowflake text-green-600 text-xl"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h4 class="font-medium">Cold Storage Unit</h4>
+                                <p class="text-sm text-gray-600">1.8 km away</p>
+                            </div>
+                            <i class="ph ph-caret-right text-gray-400"></i>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="b2b-market-content" class="mandi-section hidden">
+                <div class="card p-5 mb-4">
+                    <div class="text-center mb-4">
+                        <div class="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <i class="ph ph-handshake text-3xl text-yellow-500"></i>
+                        </div>
+                        <h2 class="text-lg font-semibold text-gray-800 mb-2 section-title">B2B Marketplace</h2>
+                        <p class="text-gray-600 mb-4">Sell your produce directly to bulk buyers</p>
+                        
+                        <a href="b2b-marketplace.html" class="btn-primary inline-block w-full mb-4">
+                            <i class="ph ph-storefront mr-2"></i> Enter Market
+                        </a>
+                        
+                       <a href="create-listing.html"> <div class="grid grid-cols-2 gap-3">
+                            <button class="btn-secondary flex flex-col items-center">
+                                <i class="ph ph-plus-circle text-2xl mb-2"></i>
+                                <span class="text-sm font-medium"> List Produce</span>
+                            </button></a>
+                            <button class="btn-secondary flex flex-col items-center">
+                                <i class="ph ph-magnifying-glass text-2xl mb-2"></i>
+                                <span class="text-sm font-medium">Find Buyers</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card p-4">
+                    <h3 class="font-semibold text-gray-800 mb-3">Recent Transactions</h3>
+                    <div class="text-center py-6">
+                        <i class="ph ph-shopping-cart text-3xl text-gray-400 mb-2"></i>
+                        <p class="text-gray-500">No transactions yet</p>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="logistics-content" class="mandi-section hidden">
+                <div class="card p-6 mb-4 text-center">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <i class="ph ph-truck text-3xl text-purple-500"></i>
+                    </div>
+                    <h2 class="text-lg font-semibold text-gray-800 mb-2 section-title">Mandi on Wheels</h2>
+                    <p class="text-gray-600 mb-4">Book vehicles for transporting your produce</p>
+                    <a href="book-logistics.html" class="btn-primary inline-block w-full">
+                        <i class="ph ph-calendar-plus mr-2"></i> Book Now
+                    </a>
+                </div>
+                
+                <div class="card p-4">
+                    <h3 class="font-semibold text-gray-800 mb-3">Available Services</h3>
+                    <div class="space-y-3">
+                        <div class="service-card flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                            <div class="flex items-center">
+                                <div class="bg-purple-100 p-2 rounded-lg mr-3">
+                                    <i class="ph ph-truck text-purple-600"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-medium">Truck Booking</h4>
+                                    <p class="text-sm text-gray-600">For bulk transport</p>
+                                </div>
+                            </div>
+                            <i class="ph ph-caret-right text-gray-400"></i>
+                        </div>
+                        <div class="service-card flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                            <div class="flex items-center">
+                                <div class="bg-green-100 p-2 rounded-lg mr-3">
+                                    <i class="ph ph-tractor text-green-600"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-medium">Tractor Hire</h4>
+                                    <p class="text-sm text-gray-600">For local transport</p>
+                                </div>
+                            </div>
+                            <i class="ph ph-caret-right text-gray-400"></i>
+                        </div>
+                        <div class="service-card flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                            <div class="flex items-center">
+                                <div class="bg-blue-100 p-2 rounded-lg mr-3">
+                                    <i class="ph ph-van text-blue-600"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-medium">Mini Van</h4>
+                                    <p class="text-sm text-gray-600">For small quantities</p>
+                                </div>
+                            </div>
+                            <i class="ph ph-caret-right text-gray-400"></i>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="bottom-nav">
+            <div class="flex justify-around items-center">
+                <a href="index.html" id="home-btn" class="nav-item text-gray-500">
+                    <i class="ph ph-house text-2xl"></i>
+                    <span class="text-xs mt-1">Home</span>
+                </a>
+                <a href="#" id="live-mandi-nav-btn" data-section="mandi-menu" class="mandi-nav-item nav-item text-green-600 active">
+                    <i class="ph ph-storefront text-2xl"></i>
+                    <span class="text-xs mt-1 font-semibold">Live Mandi</span>
+                </a>
+                <a href="my-plots.html" id="my-plots-btn" class="nav-item text-gray-500">
+                    <i class="ph ph-plant text-2xl"></i>
+                    <span class="text-xs mt-1">My Plots</span>
+                </a>
+                <a href="questions.html" class="nav-item text-gray-500">
+                    <i class="ph ph-question text-2xl"></i>
+                    <span class="text-xs mt-1">Questions</span>
+                </a>
+                <a href="menu.html" id="menu-btn" class="nav-item text-gray-50g-500">
+                    <i class="ph ph-user-circle text-2xl"></i>
+                    <span class="text-xs mt-1">Menu</span>
+                </a>
+            </div>
+        </footer>
+
+        <div id="coming-soon-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="fixed inset-0 bg-black bg-opacity-50" id="coming-soon-overlay"></div>
+            
+            <div class="card p-6 w-full max-w-xs relative z-10">
+                <h3 class="text-lg font-semibold mb-2 text-gray-800">Coming Soon</h3>
+                <p class="text-gray-600 mb-6">This feature is under development.</p>
+                <div class="flex justify-end space-x-3">
+                    <button id="coming-soon-cancel" class="modal-btn bg-gray-200 text-gray-700 hover:bg-gray-300">Cancel</button>
+                    <button id="coming-soon-ok" class="modal-btn bg-green-600 text-white hover:bg-green-700">OK</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="location-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="fixed inset-0 bg-black bg-opacity-50" id="location-overlay"></div>
+            
+            <div class="card p-6 w-full max-w-xs relative z-10 space-y-4">
+                <h3 class="text-lg font-semibold mb-2 text-gray-800">Change Location</h3>
+                <div>
+                    <label for="state-select" class="block text-sm font-medium text-gray-700 mb-1">State</label>
+                    <select id="state-select" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
+                        <option value="">Select State</option>
+                        </select>
+                </div>
+                <div>
+                    <label for="district-select" class="block text-sm font-medium text-gray-700 mb-1">District</label>
+                    <select id="district-select" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500" disabled>
+                        <option value="">Select State First</option>
+                        </select>
+                </div>
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button id="location-cancel-btn" class="modal-btn bg-gray-200 text-gray-700 hover:bg-gray-300">Cancel</button>
+                    <button id="location-save-btn" class="modal-btn bg-green-600 text-white hover:bg-green-700" disabled>Apply</button>
+                </div>
+            </div>
+        </div>
+        </div> <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        const firebaseConfig = { /* ... Firebase config ... */
+             apiKey: "AIzaSyDg7g1N_Xjz6H-EdvW4CvAnwLiOsHlL5LE",
+             authDomain: "smaart-krishi.firebaseapp.com",
+             projectId: "smaart-krishi",
+             storageBucket: "smaart-krishi.firebasestorage.app",
+             messagingSenderId: "947583038951",
+             appId: "1:947583038951:web:1a75a02ff10ee54fc73942",
+             measurementId: "G-9NSMS22REQ"
+        };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- DOM Elements ---
+        const userLocationPricesEl = document.getElementById('user-location-prices');
+        const mandiMenu = document.getElementById('mandi-menu');
+        const mandiMenuItems = document.querySelectorAll('.mandi-menu-item');
+        const mandiSections = document.querySelectorAll('.mandi-section');
+        const mandiTitle = document.getElementById('mandi-title');
+        const mandiLoading = document.getElementById('mandi-loading');
+        const mandiError = document.getElementById('mandi-error');
+        const mandiHomeLink = document.getElementById('mandi-home-link');
+        const mandiBackBtn = document.getElementById('mandi-back-btn');
+        const mandiCropPriceResults = document.getElementById('mandi-crop-price-results');
+        const mandiCropPriceSources = document.getElementById('mandi-crop-price-sources');
+        const vegetableGrid = document.getElementById('vegetable-grid');
+        const priceResultsArea = document.getElementById('price-results-area');
+        const selectedCropNameEl = document.getElementById('selected-crop-name');
+        const cropSearchInput = document.getElementById('crop-search-input');
+        const cropSearchMicBtn = document.getElementById('crop-search-mic-btn');
+        const liveMandiNavBtn = document.getElementById('live-mandi-nav-btn');
+        // Chart elements
+        const historicalChartCard = document.getElementById('historical-chart-card');
+        const chartTimespanButtons = document.querySelectorAll('.timespan-btn');
+        const chartLoading = document.getElementById('chart-loading');
+        const chartError = document.getElementById('chart-error');
+        const chartCanvas = document.getElementById('priceChart');
+        const chartMandiNameEl = document.getElementById('chart-mandi-name');
+
+        // --- NEW MODAL DOM ELEMENTS ---
+        const bookDroneBtn = document.getElementById('book-drone-btn');
+        const comingSoonModal = document.getElementById('coming-soon-modal');
+        const comingSoonCancel = document.getElementById('coming-soon-cancel');
+        const comingSoonOk = document.getElementById('coming-soon-ok');
+        const comingSoonOverlay = document.getElementById('coming-soon-overlay');
+
+        // --- *** NEW LOCATION MODAL DOM ELEMENTS *** ---
+        const changeLocationBtn = document.getElementById('change-location-btn');
+        const locationModal = document.getElementById('location-modal');
+        const locationOverlay = document.getElementById('location-overlay');
+        const locationCancelBtn = document.getElementById('location-cancel-btn');
+        const locationSaveBtn = document.getElementById('location-save-btn');
+        const stateSelect = document.getElementById('state-select');
+        const districtSelect = document.getElementById('district-select');
+
+
+        let currentUser = null;
+        let userData = null;
+        let isUserDataLoaded = false;
+        let priceChartInstance = null; // To hold the Chart.js instance
+        let currentCropForChart = null; // Store crop name for chart updates
+        let currentMandiForChart = null; // Store mandi name for chart updates
+        let isCurrentCropFruit = false; // Flag for unit conversion
+
+        let activeLocation = { district: null, state: null }; // NEW: To store the currently active location
+
+        // NEW: Simplified location data for the dropdowns.
+        const locationData = {
+            "Uttar Pradesh": ["Agra", "Aligarh", "Prayagraj", "Bareilly", "Gorakhpur", "Jhansi", "Kanpur", "Lucknow", "Meerut", "Moradabad", "Varanasi"],
+            "Madhya Pradesh": ["Bhopal", "Gwalior", "Indore", "Jabalpur", "Rewa", "Sagar", "Ujjain"],
+            "Bihar": ["Bhagalpur", "Gaya", "Muzaffarpur", "Patna", "Purnia"],
+            "Rajasthan": ["Ajmer", "Bikaner", "Jaipur", "Jodhpur", "Kota", "Udaipur"],
+            "Haryana": ["Ambala", "Faridabad", "Gurugram", "Hisar", "Karnal", "Rohtak"],
+            "Punjab": ["Amritsar", "Jalandhar", "Ludhiana", "Patiala"]
+            // ... Add more states and districts as needed
+        };
+
+        const commonCrops = [
+             { name: "Potato", emoji: "🥔" },
+             { name: "Onion", emoji: "🧅" },
+             { name: "Tomato", emoji: "🍅" },
+             { name: "Wheat", emoji: "🌾" },
+             { name: "Paddy", emoji: "🍚" },
+             { name: "Mustard", emoji: "🌼" },
+             { name: "Sugarcane", emoji: "🎋" },
+             { name: "Maize", emoji: "🌽" },
+             { name: "Brinjal", emoji: "🍆" },
+             { name: "Cauliflower", emoji: "🥦" },
+             { name: "Cabbage", emoji: "🥬" },
+             { name: "Carrot", emoji: "🥕" }, // Replaced Okra
+             { name: "Mango", emoji: "🥭" },
+             { name: "Apple", emoji: "🍎" },
+             { name: "Banana", emoji: "🍌" }
+        ];
+
+        // --- Hindi -> English Translation Map ---
+        const cropTranslations = { /* ... translations ... */
+            "आलू": "Potato", "प्याज": "Onion", "टमाटर": "Tomato",
+            "गेहूँ": "Wheat", "धान": "Paddy", "सरसों": "Mustard",
+            "मक्का": "Maize", "चना": "Gram", "बाजरा": "Bajra",
+            "गन्ना": "Sugarcane", "कपास": "Cotton", "अरहर": "Arhar",
+            "सोयाबीन": "Soyabean", "जौ": "Barley", "मटर": "Peas",
+            "बैंगन": "Brinjal", "फूलगोभी": "Cauliflower", "पत्तागोभी": "Cabbage",
+             "भिंडी": "Okra", "लौकी": "Bottle Gourd", "तोरई": "Ridge Gourd",
+             "करेला": "Bitter Gourd", "खीरा": "Cucumber", "मूली": "Radish",
+             "गाजर": "Carrot", "पालक": "Spinach", "मेथी": "Fenugreek",
+             "हरी मिर्च": "Green Chilli", "अदरक": "Ginger", "लहसुन": "Garlic",
+             // Fruits
+             "आम": "Mango", "सेब": "Apple", "केला": "Banana", "संतरा": "Orange",
+             "अंगूर": "Grape", "अमरूद": "Guava", "अनार": "Pomegranate",
+             "पपीता": "Papaya", "अनानास": "Pineapple", "तरबूज": "Watermelon",
+             "खरबूजा": "Muskmelon"
+        };
+
+        // --- List of common fruits (lowercase) for unit conversion ---
+        const fruitKeywords = [
+            "apple", "banana", "mango", "orange", "grape", "guava", "pomegranate",
+            "papaya", "pineapple", "watermelon", "muskmelon", "litchi", "chikoo",
+            "strawberry", "plum", "peach", "pear", "cherry"
+        ];
+
+
+        // --- Auth Check ---
+        onAuthStateChanged(auth, async (user) => { /* ... Auth logic ... */
+             if (user) {
+                 currentUser = user;
+                 try {
+                     const userDocRef = doc(db, "users", user.uid);
+                     const userDoc = await getDoc(userDocRef);
+                     
+                     // --- *** MODIFIED AUTH BLOCK *** ---
+                     if (userDoc.exists()) {
+                         userData = userDoc.data();
+                         const displayState = (userData.state && userData.state.toLowerCase().includes("pardesh")) ? 'Uttar Pradesh' : userData.state;
+                         
+                         // NEW: Initialize activeLocation with Firebase data
+                         activeLocation.state = displayState;
+                         activeLocation.district = userData.district;
+                         
+                         updateLocationDisplay(); // NEW function
+                         populateStateDropdown(); // NEW function
+                     } else { 
+                         if (userLocationPricesEl) userLocationPricesEl.textContent = 'Location unknown'; 
+                         activeLocation.state = null; // NEW
+                         activeLocation.district = null; // NEW
+                         populateStateDropdown(); // NEW function
+                     }
+                     // --- *** END OF MODIFIED AUTH BLOCK *** ---
+
+                 } catch (error) { 
+                     if (userLocationPricesEl) userLocationPricesEl.textContent = 'Error loading location'; 
+                     activeLocation.state = null; // NEW
+                     activeLocation.district = null; // NEW
+                     populateStateDropdown(); // NEW function
+                 }
+                 finally {
+                     isUserDataLoaded = true;
+                     populateVegetableGrid();
+                 }
+             } else { 
+                 // --- [FIX] ---
+                 // Changed 'login.html' to './login.html' to ensure it's a valid relative path
+                 window.location.assign('./login.html'); 
+             }
+        });
+
+        // --- NEW MODAL LOGIC ---
+        function showComingSoonModal() {
+            comingSoonModal.classList.remove('hidden');
+        }
+
+        function hideComingSoonModal() {
+            comingSoonModal.classList.add('hidden');
+        }
+        
+        // --- Navigation Logic ---
+        function showSection(sectionId) {
+            console.log("Showing section:", sectionId);
+            
+            // Hide all sections
+            mandiMenu.classList.add('hidden');
+            mandiSections.forEach(section => {
+                section.classList.add('hidden');
+            });
+            
+            // Show the target section
+            const targetSection = document.getElementById(sectionId + '-content');
+            if (targetSection) {
+                targetSection.classList.remove('hidden');
+                console.log("Section shown:", sectionId + '-content');
+            } else {
+                console.error("Section not found:", sectionId + '-content');
+            }
+            
+            // Update title
+            const titleMap = { 
+                'live-prices': 'Live Mandi Prices', 
+                'nearby-locator': 'Nearby Locator', 
+                'b2b-market': 'B2B Marketplace', 
+                'logistics': 'Mandi on Wheels' 
+            };
+            mandiTitle.textContent = titleMap[sectionId] || 'Mandi Services';
+            
+            // Update navigation buttons visibility
+            mandiHomeLink.classList.add('hidden');
+            mandiBackBtn.classList.remove('hidden');
+        }
+        
+        function showMenu() {
+            console.log("Showing menu");
+            
+            // Hide all sections
+            mandiSections.forEach(section => {
+                section.classList.add('hidden');
+            });
+            
+            // Show menu
+            mandiMenu.classList.remove('hidden');
+            
+            // Reset title and navigation
+            mandiTitle.textContent = 'Mandi Services';
+            mandiHomeLink.classList.remove('hidden');
+            mandiBackBtn.classList.add('hidden');
+            
+            // Reset price results area
+            priceResultsArea.classList.add('hidden');
+            historicalChartCard.classList.add('hidden');
+            mandiCropPriceResults.innerHTML = '';
+            mandiCropPriceSources.innerHTML = '';
+            mandiError.classList.add('hidden');
+            cropSearchInput.value = '';
+            
+            // Destroy chart if exists
+            if (priceChartInstance) {
+                priceChartInstance.destroy();
+                priceChartInstance = null;
+            }
+        }
+        
+        // --- *** NEW: Location Modal Logic *** ---
+        function updateLocationDisplay() {
+            if (activeLocation.district && activeLocation.state) {
+                userLocationPricesEl.textContent = `${activeLocation.district}, ${activeLocation.state}`;
+            } else {
+                userLocationPricesEl.textContent = 'Location not set';
+            }
+        }
+
+        function populateStateDropdown() {
+            stateSelect.innerHTML = '<option value="">Select State</option>'; // Reset
+            for (const state of Object.keys(locationData)) {
+                const option = document.createElement('option');
+                option.value = state;
+                option.textContent = state;
+                if (state === activeLocation.state) {
+                    option.selected = true; // Pre-select the active state
+                }
+                stateSelect.appendChild(option);
+            }
+            // If a state is pre-selected, populate districts
+            if (activeLocation.state) {
+                populateDistrictDropdown(activeLocation.state);
+            }
+        }
+
+        function populateDistrictDropdown(selectedState) {
+            const districts = locationData[selectedState];
+            districtSelect.innerHTML = '<option value="">Select District</option>'; // Reset
+            if (districts) {
+                districtSelect.disabled = false;
+                districts.forEach(district => {
+                    const option = document.createElement('option');
+                    option.value = district;
+                    option.textContent = district;
+                    if (district === activeLocation.district) {
+                        option.selected = true; // Pre-select active district
+                    }
+                    districtSelect.appendChild(option);
+                });
+            } else {
+                districtSelect.disabled = true;
+                districtSelect.innerHTML = '<option value="">Select State First</option>';
+            }
+            checkModalSaveButton(); // Check if save button should be enabled
+        }
+
+        function checkModalSaveButton() {
+            // Enable save only if both a valid state and district are selected
+            const state = stateSelect.value;
+            const district = districtSelect.value;
+            if (state && district && locationData[state] && locationData[state].includes(district)) {
+                locationSaveBtn.disabled = false;
+            } else {
+                locationSaveBtn.disabled = true;
+            }
+        }
+
+        // --- Event Listeners for new Modal ---
+        changeLocationBtn.addEventListener('click', () => {
+            // Refresh dropdowns with current active location every time modal is opened
+            populateStateDropdown(); 
+            locationModal.classList.remove('hidden');
+        });
+
+        locationCancelBtn.addEventListener('click', () => locationModal.classList.add('hidden'));
+        locationOverlay.addEventListener('click', () => locationModal.classList.add('hidden'));
+
+        stateSelect.addEventListener('change', () => {
+            // When state changes, reset district and update dropdown
+            activeLocation.district = null; // Deselect district
+            populateDistrictDropdown(stateSelect.value);
+        });
+
+        districtSelect.addEventListener('change', checkModalSaveButton); // Check save button on district change
+
+        locationSaveBtn.addEventListener('click', () => {
+            // 1. Update activeLocation
+            activeLocation.state = stateSelect.value;
+            activeLocation.district = districtSelect.value;
+            
+            // 2. Update display
+            updateLocationDisplay();
+            
+            // 3. Close modal
+            locationModal.classList.add('hidden');
+            
+            // 4. IMPORTANT: Re-fetch data if a crop is selected
+            const currentCrop = selectedCropNameEl.textContent;
+            if (currentCrop && priceResultsArea.classList.contains('hidden') === false) {
+                console.log(`Location changed. Re-fetching prices for ${currentCrop}...`);
+                // Hide historical chart, as it's for the old mandi
+                historicalChartCard.classList.add('hidden'); 
+                if (priceChartInstance) {
+                    priceChartInstance.destroy();
+                    priceChartInstance = null;
+                }
+                fetchMandiPricesWithGemini(currentCrop);
+            }
+        });
+        // --- *** End of NEW Location Modal Logic *** ---
+
+        // Menu item click handlers
+        mandiMenuItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetSectionId = item.dataset.section;
+                console.log("Menu item clicked:", targetSectionId);
+                showSection(targetSectionId);
+            });
+        });
+        
+        // Back button handler
+        mandiBackBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log("Back button clicked");
+            showMenu();
+        });
+        
+        // Bottom nav "Live Mandi" button handler
+        liveMandiNavBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log("Live Mandi nav clicked");
+            showMenu();
+
+            // Manually set this as active since its click is special
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            liveMandiNavBtn.classList.add('active');
+        });
+
+        // --- NEW MODAL EVENT LISTENERS ---
+        bookDroneBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log("Book drone clicked");
+            showComingSoonModal();
+        });
+
+        comingSoonCancel.addEventListener('click', hideComingSoonModal);
+        comingSoonOk.addEventListener('click', hideComingSoonModal);
+        comingSoonOverlay.addEventListener('click', hideComingSoonModal);
+
+
+        // --- Populate Crop Grid ---
+        function populateVegetableGrid() {
+            vegetableGrid.innerHTML = ''; // Clear previous items
+            commonCrops.forEach(crop => {
+                const button = document.createElement('button');
+                // Adjusted styles for a cleaner icon-based grid
+                button.className = 'crop-item';
+                button.dataset.cropName = crop.name;
+                
+                // Use emoji as the icon
+                button.innerHTML = `
+                    <div class="text-3xl h-12 flex items-center justify-center mb-2">${crop.emoji}</div>
+                    <span class="text-xs font-semibold text-gray-700 text-center">${crop.name}</span>`;
+                
+                button.addEventListener('click', () => {
+                    const cropName = button.dataset.cropName;
+                    selectedCropNameEl.textContent = cropName;
+                    priceResultsArea.classList.remove('hidden');
+                    historicalChartCard.classList.add('hidden'); // Hide chart initially
+                    fetchMandiPricesWithGemini(cropName);
+                });
+                vegetableGrid.appendChild(button);
+            });
+        }
+
+        // --- Crop Search Logic ---
+        cropSearchInput.addEventListener('keypress', (e) => {
+             if (e.key === 'Enter') {
+                 e.preventDefault();
+                 const cropName = cropSearchInput.value.trim();
+                 if (cropName) {
+                     // Display the original search term, even if it's Hindi
+                     selectedCropNameEl.textContent = cropName;
+                     priceResultsArea.classList.remove('hidden');
+                     historicalChartCard.classList.add('hidden'); // Hide chart initially
+                     fetchMandiPricesWithGemini(cropName); // Fetch prices
+                 }
+             }
+        });
+
+        // --- Speech Recognition ---
+        if ('webkitSpeechRecognition' in window) {
+            const recognition = new webkitSpeechRecognition();
+            recognition.lang = 'hi-IN';
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            cropSearchMicBtn.addEventListener('click', () => {
+                cropSearchMicBtn.classList.add('text-blue-600', 'listening');
+                try { recognition.start(); }
+                catch(e) { console.error("Mic start error", e); cropSearchMicBtn.classList.remove('text-blue-600', 'listening');}
+            });
+
+            recognition.onresult = (event) => {
+                const speechResult = event.results[0][0].transcript;
+                cropSearchInput.value = speechResult;
+                if (speechResult) {
+                     // Display the original spoken term
+                     selectedCropNameEl.textContent = speechResult;
+                     priceResultsArea.classList.remove('hidden');
+                      historicalChartCard.classList.add('hidden'); // Hide chart initially
+                     fetchMandiPricesWithGemini(speechResult); // Fetch prices
+                }
+            };
+
+            recognition.onend = () => { cropSearchMicBtn.classList.remove('text-blue-600', 'listening'); };
+            recognition.onerror = (event) => {
+                 console.error('Speech recognition error:', event.error);
+                 // Replaced alert() with a console log
+                 console.error(`Speech recognition error: ${event.error}. Please ensure microphone access is allowed.`);
+                 cropSearchMicBtn.classList.remove('text-blue-600', 'listening');
+            };
+        } else { cropSearchMicBtn.style.display = 'none'; }
+
+        // --- Helper: Wait for User Data ---
+        function waitForUserData() {
+             return new Promise((resolve, reject) => {
+                 if (isUserDataLoaded) { if(userData) resolve(); else reject(new Error("User profile data not loaded.")); return; }
+                 const intervalId = setInterval(() => { if (isUserDataLoaded) { clearInterval(intervalId); if(userData) resolve(); else reject(new Error("User data load failed.")); } }, 100);
+                 setTimeout(() => { clearInterval(intervalId); reject(new Error("Timeout waiting for user data.")); }, 5000);
+             });
+        }
+        // --- Helper: Fetch with Backoff ---
+        async function fetchWithBackoff(url, options, maxAttempts = 4) {
+             let attempts = 0; let delay = 1000;
+             while(attempts < maxAttempts) {
+                 try {
+                     const response = await fetch(url, options);
+                     if (response.ok) return response;
+                     const errorStatus = response.status; const errorText = await response.text();
+                     console.error(`API Error (Attempt ${attempts + 1}/${maxAttempts}): ${errorStatus}`, errorText);
+                     if (errorStatus === 429 || errorStatus >= 500) { attempts++; if (attempts >= maxAttempts) throw new Error(`API Error (${errorStatus}): Max retries.`); await new Promise(r => setTimeout(r, delay)); delay *= 2; }
+                     else { let msg = `API Error (${errorStatus}): ${response.statusText}`; try { const d = JSON.parse(errorText); msg = `API Error (${errorStatus}): ${d?.error?.message || errorText}`; } catch (p) { msg = `API Error (${errorStatus}): ${errorText}`; } throw new Error(msg); }
+                 } catch (networkError) { console.error(`Network Error (Attempt ${attempts + 1}/${maxAttempts}):`, networkError); attempts++; if (attempts >= maxAttempts) throw new Error(`Network Error: Max retries. ${networkError.message}`); await new Promise(r => setTimeout(r, delay)); delay *= 2; }
+             } throw new Error(`API call failed after ${maxAttempts} attempts.`);
+        }
+
+        // --- Parse AI Response (Current Prices) ---
+        function parseMandiDataFromText(text) {
+             const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0 && (line.includes('Min') || line.includes('Modal')));
+             const data = [];
+             // Regex flexible to handle both "... - DATE (DD/MM/YYYY)" and "... - DD/MM/YYYY"
+             const lineRegex = /([\w\s.-]+(?:\([\w\s.-]+\))?):?\s*(.*?)\s*-\s*Min\s*₹?(\d+)\s*-\s*Max\s*₹?(\d+)\s*-\s*Modal\s*₹?(\d+)\s*-\s*(?:DATE\s*\()?\s*(\d{1,2}\/\d{1,2}\/\d{4})\s*\)?$/i;
+
+             lines.forEach(line => {
+                 const match = line.match(lineRegex);
+                 if (match) {
+                     try {
+                         // Extract and clean market name
+                         let marketName = match[1].trim().replace(/\*+$/, '').trim();
+                         // Extract and clean variety name
+                         let varietyName = match[2].trim() || "N/A";
+                         // Remove potential leading/trailing hyphens or colons from variety
+                         varietyName = varietyName.replace(/^[:-\s]+|[:-\s]+$/g, '');
+
+                         data.push({
+                             market: marketName,
+                             variety: varietyName,
+                             minPrice: parseInt(match[3], 10),
+                             maxPrice: parseInt(match[4], 10),
+                             modalPrice: parseInt(match[5], 10),
+                             date: match[6]
+                         });
+                     } catch (e) { console.warn("Parse line error:", line, e); }
+                 } else {
+                     console.warn("Line format mismatch:", line);
+                 }
+             });
+             return data;
+        }
+
+        // --- Render Current Price Table ---
+        function renderMandiTable(parsedData, isFruit) { // Added isFruit parameter
+             mandiCropPriceResults.innerHTML = '';
+             if (parsedData.length === 0) { 
+                 mandiCropPriceResults.innerHTML = `
+                     <div class="empty-state">
+                         <i class="ph ph-warning"></i>
+                         <p>Could not extract structured price details</p>
+                     </div>
+                 `; 
+                 return; 
+             }
+
+             const units = isFruit ? 'kg' : 'Quintal'; // Determine units
+             const divisor = isFruit ? 100 : 1; // Factor for conversion (100 for fruit, 1 for others)
+
+             const table = document.createElement('table');
+             table.className = 'w-full text-sm text-left text-gray-700 whitespace-nowG-rap price-table';
+             // Update table headers dynamically
+             table.innerHTML = `<thead><tr><th class="px-4 py-3">Market</th><th class="px-2 py-3">Variety</th><th class="px-2 py-3 text-right">Min (₹/${units})</th><th class="px-2 py-3 text-right">Max (₹/${units})</th><th class="px-2 py-3 text-right">Modal (₹/${units})</th><th class="px-4 py-3">Date</th></tr></thead><tbody></tbody>`;
+             const tbody = table.querySelector('tbody');
+
+             let currentMarket = null; // Track market changes for grouping
+             parsedData.forEach((item, index) => {
+                 const row = document.createElement('tr');
+                 let rowClass = `cursor-pointer transition-colors`;
+                 // Add top border and padding if the market name changes
+                 if (item.market !== currentMarket && currentMarket !== null) {
+                     rowClass += ' market-group-start'; // Apply spacing style defined in <style>
+                 }
+                 row.className = rowClass;
+                 currentMarket = item.market; // Update current market tracker
+
+                 // Apply divisor for fruits
+                 const minP = (item.minPrice / divisor).toFixed(2);
+                 const maxP = (item.maxPrice / divisor).toFixed(2);
+                 const modalP = (item.modalPrice / divisor).toFixed(2);
+
+                 row.innerHTML = `<td class="px-4 py-3 font-medium text-gray-900">${item.market}</td><td class="px-2 py-3">${item.variety}</td><td class="px-2 py-3 text-right">${minP}</td><td class="px-2 py-3 text-right">${maxP}</td><td class="px-2 py-3 text-right font-semibold text-green-700">${modalP}</td><td class="px-4 py-3">${item.date}</td>`;
+
+                 row.addEventListener('click', () => {
+                     // English name determination remains the same
+                     const englishCropName = Object.keys(cropTranslations).find(key => cropTranslations[key].toLowerCase() === selectedCropNameEl.textContent.toLowerCase())
+                                             ? selectedCropNameEl.textContent
+                                             : cropTranslations[selectedCropNameEl.textContent] || selectedCropNameEl.textContent;
+
+                     currentCropForChart = englishCropName;
+                     currentMandiForChart = item.market;
+                     isCurrentCropFruit = isFruit; // Store if the clicked row's crop is a fruit
+                     chartMandiNameEl.textContent = `${item.market}`;
+                     historicalChartCard.classList.remove('hidden');
+                     chartTimespanButtons.forEach(btn => {
+                          btn.classList.toggle('bg-green-600', btn.dataset.days === '30'); btn.classList.toggle('text-white', btn.dataset.days === '30');
+                          btn.classList.toggle('bg-gray-200', btn.dataset.days !== '30'); btn.classList.toggle('text-gray-700', btn.dataset.days !== '30');
+                     });
+                     fetchHistoricalData(30);
+                     historicalChartCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                 });
+                 tbody.appendChild(row);
+             });
+             mandiCropPriceResults.appendChild(table);
+        }
+
+
+        // --- Fetch Current Mandi Prices ---
+        async function fetchMandiPricesWithGemini(inputCropName) { // Renamed parameter
+            try { await waitForUserData(); } catch (e) { mandiError.textContent = e.message; mandiError.classList.remove('hidden'); mandiLoading.classList.add('hidden'); return; }
+            if (!inputCropName) { mandiCropPriceResults.innerHTML = '<p class="text-gray-500 text-center">Select crop.</p>'; return; }
+
+            mandiLoading.classList.remove('hidden'); mandiError.classList.add('hidden'); mandiCropPriceResults.innerHTML = ''; mandiCropPriceSources.innerHTML = '';
+            historicalChartCard.classList.add('hidden'); // Ensure chart is hidden initially
+
+            // --- *** MODIFIED: Use activeLocation instead of userData *** ---
+            if (!activeLocation.district || !activeLocation.state) {
+                 mandiError.textContent = "Please select a location first.";
+                 mandiError.classList.remove('hidden');
+                 mandiLoading.classList.add('hidden');
+                 return;
+            }
+            const district = activeLocation.district;
+            const state = activeLocation.state; // No need to re-format, it's already clean
+            // --- *** END OF MODIFICATION *** ---
+
+             // --- Translate Hindi input to English before sending to API ---
+             const englishCropName = cropTranslations[inputCropName.trim()] || inputCropName.trim();
+             selectedCropNameEl.textContent = inputCropName; // Keep showing original input
+
+             // --- Determine if it's a fruit ---
+             isCurrentCropFruit = fruitKeywords.includes(englishCropName.toLowerCase());
+
+            const userQuery = `First, check relevance of "${englishCropName}" for mandis in ${district}, ${state}, India. If relevant, find latest Mandi prices per quintal for "${englishCropName}" from MULTIPLE DIFFERENT MANDIS within ${district}, ${state}, India using Google Search. Crucially, INCLUDE THE SPECIFIC VARIETY NAME (including common local names like 'Desi', 'Red', 'Hybrid' etc. if available) for each entry. Present results ONLY as a simple list. Each item MUST follow this EXACT format: Market Name: Variety Name - Min ₹PRICE - Max ₹PRICE - Modal ₹PRICE - DATE (DD/MM/YYYY). List multiple markets and varieties separately. NO extra text, intros, summaries, bolding. If not relevant or no specific price data, respond ONLY with: Price data not found for ${englishCropName} in ${district}, ${state}.`;
+            const apiKey = "AIzaSyAR_TpX56K0wHYIjZ7WEFNZ26muEPA2iAM";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            const payload = { contents: [{ parts: [{ text: userQuery }] }], tools: [{ "google_search": {} }], systemInstruction: { parts: [{ text: "You are an agricultural market data API... provide ONLY Mandi price data from Google Search covering MULTIPLE MANDIS and SPECIFIC VARIETIES (including local names). Use format: Market: Variety - Min ₹PRICE - Max ₹PRICE - Modal ₹PRICE - DATE (DD/MM/YYYY). If no data, provide ONLY the 'not found' message." }] }, };
+            console.log("Sending current price query for:", englishCropName);
+
+            try {
+                const response = await fetchWithBackoff(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const result = await response.json(); console.log("Current Price Response:", result);
+                const candidate = result.candidates?.[0]; const text = candidate?.content?.parts?.[0]?.text;
+
+                if (text) {
+                    mandiCropPriceResults.textContent = text; // Store raw text first
+                    const parsedData = parseMandiDataFromText(text);
+                    if (parsedData.length > 0) {
+                        // Pass the isFruit flag to the rendering function
+                        renderMandiTable(parsedData, isCurrentCropFruit);
+                     }
+                    else { console.warn("Parsing failed, showing raw text."); priceResultsArea.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+
+                    let sources = []; const meta = candidate.groundingMetadata;
+                    if (meta?.groundingAttributions) { sources = meta.groundingAttributions.map(a => ({ uri: a.web?.uri, title: a.web?.title })).filter(s => s.uri && s.title); }
+                    if (sources.length > 0) { mandiCropPriceSources.innerHTML = 'Sources:<br>' + sources.map((s, i) => `<a href="${s.uri}" target="_blank" class="text-blue-600 hover:underline">${i+1}. ${s.title}</a>`).join('<br>'); }
+                    else { mandiCropPriceSources.textContent = 'Data from public web info.'; }
+                } else {
+                    const blockReason = candidate?.finishReason; const safety = candidate?.safetyRatings;
+                    if (blockReason === 'SAFETY' || (safety && safety.some(r => r.probability !== 'NEGLIGIBLE' && r.probability !== 'LOW'))) { throw new Error("Blocked due to safety filters."); }
+                    else if (result.promptFeedback?.blockReason) { throw new Error(`Request blocked: ${result.promptFeedback.blockReason}`); }
+                    else { console.error("Response Issue:", result); throw new Error("No information found."); }
+                }
+            } catch (error) { console.error("Fetch current price error:", error); mandiError.textContent = `Error: ${error.message}`; mandiError.classList.remove('hidden'); mandiCropPriceResults.innerHTML = ''; }
+            finally { mandiLoading.classList.add('hidden'); if(!mandiLoading.classList.contains('hidden') || !mandiError.classList.contains('hidden') || mandiCropPriceResults.innerHTML !== '') { priceResultsArea.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+       }
+     } // End of fetchMandiPricesWithGemini
+
+      // --- Fetch Historical Data ---
+      async function fetchHistoricalData(days) {
+           // Use the stored isCurrentCropFruit flag
+           if (!currentCropForChart || !currentMandiForChart || !userData) {
+               chartError.textContent = "Missing crop, mandi, or user data.";
+               chartError.classList.remove('hidden');
+               return;
+           }
+
+           chartLoading.classList.remove('hidden');
+           chartError.classList.add('hidden');
+           if (priceChartInstance) { priceChartInstance.destroy(); priceChartInstance = null; }
+
+           // --- *** MODIFIED: Use activeLocation instead of userData *** ---
+           if (!activeLocation.district || !activeLocation.state) {
+                 chartError.textContent = "Location data is missing.";
+                 chartError.classList.remove('hidden');
+                 chartLoading.classList.add('hidden');
+                 return;
+           }
+           const district = activeLocation.district;
+           const state = activeLocation.state; // No need to re-format
+           // --- *** END OF MODIFICATION *** ---
+
+           const endDate = new Date();
+           const startDate = new Date();
+           startDate.setDate(endDate.getDate() - days);
+
+           // Still request per Quintal, conversion happens later
+           const userQuery = `Find the historical daily modal price per quintal for "${currentCropForChart}" specifically in the "${currentMandiForChart}" mandi, located in ${district}, ${state}, India, for the past ${days} days (from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}). Provide the data ONLY as a valid JSON array of objects. Each object must have exactly two keys: "date" (string in "YYYY-MM-DD" format) and "modal_price" (number). Example: [{"date": "2025-10-21", "modal_price": 1350}, {"date": "2025-10-20", "modal_price": 1320}]. Do NOT include any text, conversation, markdown, or explanation before or after the JSON array. If no data is found, return an empty JSON array [].`;
+           const apiKey = "AIzaSyDDWFT1tXk3sYn1JmvnrSvCi0bRyhLviGE";
+           const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+           const payload = {
+               contents: [{ parts: [{ text: userQuery }] }],
+               generationConfig: { "responseMimeType": "application/json" },
+               systemInstruction: { parts: [{ text: "You are a historical agricultural market data API. Respond ONLY with a valid JSON array matching the requested schema: [{'date': 'YYYY-MM-DD', 'modal_price': number}]. Return an empty array if no data." }] }
+           };
+
+           console.log("Sending historical query for:", currentCropForChart);
+
+           try {
+               const response = await fetchWithBackoff(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+               const result = await response.json();
+               console.log("Historical Price Response:", result);
+
+               const candidate = result.candidates?.[0];
+               let jsonText = candidate?.content?.parts?.[0]?.text;
+
+               if (jsonText) {
+                    jsonText = jsonText.replace(/^```json\s*|```\s*$/g, '').trim();
+                    console.log("Cleaned historical JSON text:", jsonText);
+                    
+                    let historicalData = [];
+                    if (jsonText.startsWith('[') && jsonText.endsWith(']')) { 
+                       try { historicalData = JSON.parse(jsonText); }
+                       catch (jsonError) { console.error("JSON Parsing Error:", jsonError); throw new Error("AI response format error (invalid JSON)."); }
+                    } else {
+                       if(jsonText.length > 0) { console.error("AI response not a JSON array:", jsonText); throw new Error("AI response format error (not a JSON array)."); }
+                       historicalData = []; 
+                    }
+                    
+                   historicalData.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                   if (historicalData.length > 0) {
+                       // Pass the isFruit flag to the chart renderer
+                       renderPriceChart(historicalData, isCurrentCropFruit);
+                   } else {
+                       throw new Error(`No historical data found for ${currentCropForChart} in ${currentMandiForChart} for the last ${days} days.`);
+                   }
+               } else {
+                   const blockReason = candidate?.finishReason;
+                   if (blockReason === 'SAFETY') { throw new Error("Historical data blocked by safety filters."); }
+                   else if (result.promptFeedback?.blockReason) { throw new Error(`Request blocked: ${result.promptFeedback.blockReason}`); }
+                   else { console.error("Historical Response Issue:", result); throw new Error("AI did not provide historical data."); }
+               }
+           } catch (error) {
+               console.error("Fetch historical price error:", error);
+               chartError.textContent = `Error: ${error.message}`;
+               chartError.classList.remove('hidden');
+           } finally {
+               chartLoading.classList.add('hidden');
+           }
+      }
+
+        // --- Render Historical Price Chart ---
+        function renderPriceChart(data, isFruit) { // Added isFruit parameter
+             if (priceChartInstance) { priceChartInstance.destroy(); }
+             if (!chartCanvas) { console.error("Chart canvas not found!"); chartError.textContent = "Error: Chart canvas missing."; chartError.classList.remove('hidden'); return; }
+             const ctx = chartCanvas.getContext('2d');
+             if (!ctx) { console.error("Could not get 2D context!"); chartError.textContent = "Error: Chart init failed."; chartError.classList.remove('hidden'); return; }
+
+             const labels = data.map(item => item.date);
+             // Convert prices to Kg if it's a fruit, otherwise show as Quintal
+             const divisor = isFruit ? 100 : 1; // API returns per quintal
+             const prices = data.map(item => item.modal_price / divisor);
+             const units = isFruit ? 'kg' : 'Quintal';
+             const chartLabel = `Modal Price (₹/${units})`;
+
+             try {
+                 priceChartInstance = new Chart(ctx, {
+                     type: 'line',
+                     data: { labels: labels, datasets: [{ label: chartLabel, data: prices, borderColor: 'rgb(22, 163, 74)', backgroundColor: 'rgba(22, 163, 74, 0.1)', tension: 0.1, fill: true, pointRadius: 3, pointHoverRadius: 5 }] },
+                     options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: false, ticks: { callback: (v) => '₹' + v.toFixed(2) } }, x: { ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 10 } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${c.dataset.label || ''}: ₹${c.parsed.y.toFixed(2)}` } } } }
+                 });
+             } catch (chartError) { console.error("Chart.js error:", chartError); chartError.textContent = "Error rendering chart."; chartError.classList.remove('hidden'); }
+        }
+
+        // --- Event Listeners for Timespan Buttons ---
+        chartTimespanButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                 chartTimespanButtons.forEach(btn => { btn.classList.remove('bg-green-600', 'text-white'); btn.classList.add('bg-gray-200', 'text-gray-700'); });
+                 button.classList.add('bg-green-600', 'text-white'); button.classList.remove('bg-gray-200', 'text-gray-700');
+                 const days = parseInt(button.dataset.days, 10);
+                 fetchHistoricalData(days);
+            });
+        });
+
+        // --- [FIXED CODE] ---
+        // Add active state to bottom nav items
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                // This is the fix:
+                // We only prevent the default browser action if the link is a placeholder (href="#").
+                // This allows real links (like href="index.html") to work correctly.
+                const href = this.getAttribute('href');
+                if (href === '#') {
+                    e.preventDefault();
+                }
+                
+                // This part just styles the active button, which is fine.
+                document.querySelectorAll('.nav-item').forEach(i => {
+                    i.classList.remove('active');
+                });
+                this.classList.add('active');
+                
+                // Note: The 'live-mandi-nav-btn' has its *own* specific click listener
+                // (defined earlier) which handles calling showMenu().
+                // This general listener will also run, but the specific one
+                // does the real work for that button.
+            });
+        });
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily News - SmartKrishi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js" type="module"></script>
+    <style>
+        /* Add a simple spinning loader animation */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #e5e7eb; /* gray-200 */
+            border-top-color: #16a34a; /* green-600 */
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        /* Style for news images */
+        .news-image {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            border-bottom: 1px solid #e5e7eb;
+        }
+    </style>
+</head>
+<body class="bg-gray-200 flex justify-center">
+
+    <div class="w-full max-w-sm h-screen bg-gray-50 flex flex-col relative overflow-hidden">
+        
+        <nav id="fixed-top-header" class="bg-white shadow-sm w-full flex-shrink-0 z-20">
+            <div class="px-4 py-3 flex items-center">
+                <a href="index.html" id="back-to-home-btn" class="text-gray-600 p-1 rounded-full hover:bg-gray-100">
+                    <i class="ph ph-arrow-left text-2xl"></i>
+                </a>
+                <h1 class="text-xl font-bold text-green-700 text-center flex-grow">
+                    Today's Agri News
+                </h1>
+                <div class="w-8"></div>
+            </div>
+        </nav>
+
+        <div id="main-scroll-container" class="flex-grow overflow-y-auto pb-20">
+            
+            <div class="p-3 flex justify-center space-x-2 bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
+                <button class="lang-toggle-btn px-4 py-1 rounded-full text-sm font-semibold bg-green-600 text-white" data-lang="en">
+                    English
+                </button>
+                <button class="lang-toggle-btn px-4 py-1 rounded-full text-sm font-semibold bg-gray-200 text-gray-700" data-lang="hi">
+                    हिन्दी
+                </button>
+            </div>
+            <main id="news-container" class="p-4 space-y-4">
+                
+                <div id="news-loading" class="flex flex-col items-center justify-center pt-20">
+                    <div class="spinner"></div>
+                    <p class="text-gray-500 mt-4">Fetching today's top agri news...</p>
+                </div>
+
+                </main>
+        </div>
+        
+        <footer class="bg-white border-t border-gray-200 w-full p-2 flex justify-around items-center absolute bottom-0 z-10">
+            <a href="index.html" id="home-btn" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors">
+                <i class="ph ph-house text-2xl"></i>
+                <span class="text-xs">Home</span>
+            </a>
+            <a href="mandi.html" id="live-mandi-btn" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors">
+                <i class="ph ph-storefront text-2xl"></i>
+                <span class="text-xs">Live Mandi</span>
+            </a>
+            <a href="my-plots.html" id="my-plots-btn" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-plant text-2xl"></i>
+                <span class="text-xs">My Plots</span>
+            </a>
+            <a href="questions.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors">
+                <i class="ph ph-question text-2xl"></i>
+                <span class="text-xs">Questions</span>
+            </a>
+            <a href="menu.html" id="menu-btn" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors">
+                <i class="ph ph-user-circle text-2xl"></i>
+                <span class="text-xs">Menu</span>
+            </a>
+        </footer>
+    </div>
+
+    <div id="alert-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-center">
+            <h3 id="alert-title" class="text-lg font-semibold text-gray-800 mb-4">Alert</h3>
+            <p id="alert-message" class="text-gray-600 mb-6">This is an alert message.</p>
+            <button id="alert-close-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition">OK</button>
+        </div>
+    </div>
+
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // Your API key
+        const NEWSDATA_API_KEY = "pub_f1a021caf85c4ba48baada51497c2243";
+        
+        // --- SECURITY WARNING ---
+        // For a real, deployed app, this key should be in a Cloud Function.
+        // ---
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDg7g1N_Xjz6H-EdvW4CvAnwLiOsHlL5LE",
+            authDomain: "smaart-krishi.firebaseapp.com",
+            projectId: "smaart-krishi",
+            storageBucket: "smaart-krishi.firebasestorage.app",
+            messagingSenderId: "947583038951",
+            appId: "1:947583038951:web:1a75a02ff10ee54fc73942",
+            measurementId: "G-9NSMS22REQ"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Get elements
+        const newsContainer = document.getElementById('news-container');
+        // Store the loader HTML so we can add it back
+        const newsLoadingHTML = newsContainer.innerHTML;
+        
+        // --- [NEW] --- Language Toggle Elements
+        const langToggleButtons = document.querySelectorAll('.lang-toggle-btn');
+        let currentLang = 'en'; // Track the current active language
+        
+        // Alert Modal Elements
+        const alertModal = document.getElementById('alert-modal');
+        const alertTitle = document.getElementById('alert-title');
+        const alertMessage = document.getElementById('alert-message');
+        const alertCloseBtn = document.getElementById('alert-close-btn');
+
+        // --- Modal Functions ---
+        function showModal(title, message) {
+            alertTitle.textContent = title;
+            alertMessage.textContent = message;
+            alertModal.classList.remove('hidden');
+        }
+        alertCloseBtn.addEventListener('click', () => alertModal.classList.add('hidden'));
+
+        // --- Auth State ---
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // User is logged in, fetch news in the default language (English)
+                fetchNews(currentLang);
+            } else {
+                // User is not logged in, redirect to login page
+                window.location.assign('login.html');
+            }
+        });
+
+        // --- [NEW] --- Language Toggle Listener
+        langToggleButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const newLang = button.dataset.lang;
+                
+                // Do nothing if the language is already active
+                if (newLang === currentLang) {
+                    return;
+                }
+                
+                currentLang = newLang; // Update the current language
+
+                // Update button styles
+                langToggleButtons.forEach(btn => {
+                    btn.classList.remove('bg-green-600', 'text-white');
+                    btn.classList.add('bg-gray-200', 'text-gray-700');
+                });
+                button.classList.add('bg-green-600', 'text-white');
+                button.classList.remove('bg-gray-200', 'text-gray-700');
+
+                // Show loader and fetch news in the new language
+                newsContainer.innerHTML = newsLoadingHTML;
+                fetchNews(newLang);
+            });
+        });
+
+
+        /**
+         * Fetches news from the newsdata.io API in a specific language.
+         * @param {string} lang - The language code ('en' or 'hi').
+         */
+        async function fetchNews(lang) {
+            if (NEWSDATA_API_KEY === "PASTE_YOUR_NEW_NEWSDATA_IO_API_KEY_HERE") {
+                showModal("API Key Missing", "Please add your newsdata.io API key to the news.html file.");
+                newsContainer.innerHTML = '<p class="text-red-500 text-center">API Key is missing.</p>';
+                return;
+            }
+            
+            // This query searches for articles that MUST have one of these words in the TITLE.
+            const query = "farmer OR crop OR agriculture OR mandi OR msp OR farming OR fertilizer OR irrigation OR tractor";
+            const country = "in"; // India
+            
+            // --- [UPDATED] ---
+            // The language is now a variable passed into the function
+            const API_URL = `https://newsdata.io/api/1/news?apikey=${NEWSDATA_API_KEY}&qInTitle=${encodeURIComponent(query)}&country=${country}&language=${lang}`;
+            // --- [END OF UPDATE] ---
+
+            try {
+                const response = await fetch(API_URL);
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`NewsData.io API error: ${errorData.results?.message || response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                // The articles are in the "results" array
+                renderNews(data.results);
+
+            } catch (error) {
+                console.error("Error fetching news:", error);
+                // Display the error inside the news container
+                newsContainer.innerHTML = `
+                    <div class="text-center p-8 text-red-500">
+                        <i class="ph ph-warning-circle text-4xl"></i>
+                        <p class="font-semibold mt-2">Could not load news</p>
+                        <p class="text-sm text-gray-600">${error.message}</p>
+                        <p class="text-xs text-gray-500 mt-2">This can happen if the API key is invalid or has reached its daily quota.</p>
+                    </div>`;
+            }
+        }
+
+        /**
+         * Renders the fetched news articles to the DOM.
+         * @param {Array} articles - An array of article objects from newsdata.io.
+         */
+        function renderNews(articles) {
+            // Clear the loader
+            newsContainer.innerHTML = '';
+
+            if (!articles || articles.length === 0) {
+                // Updated message to be more specific
+                newsContainer.innerHTML = `<p class="text-gray-500 text-center pt-10">No relevant agriculture news found in ${currentLang === 'hi' ? 'Hindi' : 'English'} today.</p>`;
+                return;
+            }
+
+            articles.forEach(article => {
+                // We only show articles that have a title and description
+                if (!article.title || !article.description) {
+                    return;
+                }
+                
+                // Use a default image if image_url is missing
+                const imageUrl = article.image_url || 'https://firebasestorage.googleapis.com/v0/b/smaart-krishi.firebasestorage.app/o/default-news.png?alt=media&token=c1935811-2b1a-4d37-9d7a-d02773c260f8';
+                
+                const articleCard = document.createElement('a');
+                articleCard.href = article.link; // Link to the full article
+                articleCard.target = "_blank"; // Open in a new tab
+                articleCard.rel = "noopener noreferrer"; // Security best practice
+                articleCard.className = "block bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow";
+                
+                articleCard.innerHTML = `
+                    <img src="${imageUrl}" alt="News Image" class="news-image" onerror="this.src='https://firebasestorage.googleapis.com/v0/b/smaart-krishi.firebasestorage.app/o/default-news.png?alt=media&token=c1935811-2b1a-4d37-9d7a-d02773c260f8'; this.onerror=null;">
+                    <div class="p-4">
+                        <h3 class="text-lg font-semibold text-gray-800">${article.title}</h3>
+                        <p class="text-gray-600 mt-1 text-sm">${article.description}</p>
+                        <p class="text-xs text-gray-400 mt-3">${article.source_id || 'News Source'}</p>
+                    </div>
+                `;
+                newsContainer.appendChild(articleCard);
+            });
+        }
+    </script>
+</body>
+</html>

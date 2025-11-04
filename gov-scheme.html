@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>सरकारी योजनाएं - स्मार्टकृषि</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js" type="module"></script>
+    <style>
+        /* हिंदी फॉन्ट के लिए */
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap');
+        html, body {
+            font-family: 'Noto Sans Devanagari', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-200 flex justify-center">
+
+    <div class="w-full max-w-sm h-screen bg-gray-50 flex flex-col relative overflow-hidden">
+        
+        <nav id="fixed-top-header" class="bg-white shadow-sm w-full flex-shrink-0 z-20">
+            <div class="px-4 py-3 flex items-center">
+                <a href="index.html" id="back-to-home-btn" class="text-gray-600 p-1 rounded-full hover:bg-gray-100">
+                    <i class="ph ph-arrow-left text-2xl"></i>
+                </a>
+                <h1 class="text-xl font-bold text-green-700 text-center flex-grow">
+                    सरकारी योजनाएं
+                </h1>
+                <div class="w-8"></div>
+            </div>
+        </nav>
+
+        <div id="main-scroll-container" class="flex-grow overflow-y-auto pb-20 p-4 space-y-5">
+            
+            <header class="text-center mb-2">
+                <h2 class="text-xl font-semibold text-gray-800">किसान कल्याण डैशबोर्ड</h2>
+                <p class="text-gray-600 text-sm">किसानों के लिए सबसे महत्वपूर्ण सरकारी योजनाओं की जानकारी।</p>
+            </header>
+
+            <div class="bg-white rounded-lg shadow-sm border-l-4 border-green-600 overflow-hidden">
+                <div class="p-4">
+                    <div class="flex items-center mb-3">
+                        <i class="ph ph-currency-inr text-3xl text-green-600 mr-3"></i>
+                        <h3 class="text-lg font-semibold text-gray-800">वित्तीय सहायता</h3>
+                    </div>
+                    <h4 class="font-semibold text-gray-700 mb-1">PM-KISAN सम्मान निधि</h4>
+                    <p class="text-sm text-gray-600 mb-4">
+                        सभी पात्र किसान परिवारों को ₹6,000 प्रति वर्ष की सीधी आय सहायता।
+                    </p>
+                    <a href="https://pmkisan.gov.in/" target="_blank" class="flex items-center justify-center w-full p-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors">
+                        अपना स्टेटस चेक करें
+                        <i class="ph ph-arrow-square-out ml-2 text-lg"></i>
+                    </a>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm border-l-4 border-blue-600 overflow-hidden">
+                <div class="p-4">
+                    <div class="flex items-center mb-3">
+                        <i class="ph ph-plant text-3xl text-blue-600 mr-3"></i>
+                        <h3 class="text-lg font-semibold text-gray-800">फसल सुरक्षा</h3>
+                    </div>
+                    <h4 class="font-semibold text-gray-700 mb-1">प्रधानमंत्री फसल बीमा योजना (PMFBY)</h4>
+                    <p class="text-sm text-gray-600 mb-4">
+                        फसल खराब होने की स्थिति में किसानों को व्यापक बीमा कवरेज और वित्तीय सहायता।
+                    </p>
+                    <a href="https://pmfby.gov.in/" target="_blank" class="flex items-center justify-center w-full p-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                        पोर्टल पर आवेदन करें
+                        <i class="ph ph-arrow-square-out ml-2 text-lg"></i>
+                    </a>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-sm border-l-4 border-yellow-600 overflow-hidden">
+                <div class="p-4">
+                    <div class="flex items-center mb-3">
+                        <i class="ph ph-tractor text-3xl text-yellow-600 mr-3"></i>
+                        <h3 class="text-lg font-semibold text-gray-800">उपकरण और सब्सिडी</h3>
+                    </div>
+                    <h4 class="font-semibold text-gray-700 mb-1">कृषि यंत्रीकरण (SMAM)</h4>
+                    <p class="text-sm text-gray-600 mb-4">
+                        ट्रैक्टर, ड्रोन और अन्य कृषि मशीनरी खरीदने के लिए सब्सिडी और वित्तीय सहायता।
+                    </p>
+                    <a href="https://agrimachinery.nic.in/" target="_blank" class="flex items-center justify-center w-full p-2 bg-yellow-600 text-white rounded-lg font-semibold hover:bg-yellow-700 transition-colors">
+                        आधिकारिक पोर्टल पर जाएं
+                        <i class="ph ph-arrow-square-out ml-2 text-lg"></i>
+                    </a>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm border-l-4 border-purple-600 overflow-hidden">
+                <div class="p-4">
+                    <div class="flex items-center mb-3">
+                        <i class="ph ph-user-check text-3xl text-purple-600 mr-3"></i>
+                        <h3 class="text-lg font-semibold text-gray-800">किसान कल्याण व पेंशन</h3>
+                    </div>
+                    <h4 class="font-semibold text-gray-700 mb-1">किसान मानधन योजना</h4>
+                    <p class="text-sm text-gray-600 mb-4">
+                        60 वर्ष की आयु प्राप्त करने पर छोटे और सीमांत किसानों को ₹3,000 की न्यूनतम मासिक पेंशन।
+                    </या>
+                    <a href="https://maandhan.in/" target="_blank" class="flex items-center justify-center w-full p-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors">
+                        अभी रजिस्टर करें
+                        <i class="ph ph-arrow-square-out ml-2 text-lg"></i>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+        
+        <footer class="bg-white border-t border-gray-200 w-full p-2 flex justify-around items-center absolute bottom-0 z-10">
+            <a href="index.html" id="home-btn" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors">
+                <i class="ph ph-house text-2xl"></i>
+                <span class="text-xs">होम</span>
+            </a>
+            <a href="mandi.html" id="live-mandi-btn" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors">
+                <i class="ph ph-storefront text-2xl"></i>
+                <span class="text-xs">लाइव मंडी</span>
+            </a>
+            <a href="my-plots.html" id="my-plots-btn" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-plant text-2xl"></i>
+                <span class="text-xs">मेरे प्लॉट</span>
+            </a>
+            <a href="questions.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors">
+                <i class="ph ph-question text-2xl"></i>
+                <span class="text-xs">सवाल</span>
+            </a>
+            <a href="menu.html" id="menu-btn" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors">
+                <i class="ph ph-user-circle text-2xl"></i>
+                <span class="text-xs">मेनू</span>
+            </a>
+        </footer>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDg7g1N_Xjz6H-EdvW4CvAnwLiOsHlL5LE",
+            authDomain: "smaart-krishi.firebaseapp.com",
+            projectId: "smaart-krishi",
+            storageBucket: "smaart-krishi.firebasestorage.app",
+            messagingSenderId: "947583038951",
+            appId: "1:947583038951:web:1a75a02ff10ee54fc73942",
+            measurementId: "G-9NSMS22REQ"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // Auth State
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // उपयोगकर्ता लॉग इन है, वे पेज देख सकते हैं
+                console.log("User is logged in:", user.uid);
+            } else {
+                // उपयोगकर्ता लॉग इन नहीं है, लॉगिन पेज पर रीडायरेक्ट करें
+                window.location.assign('login.html');
+            }
+        });
+    </script>
+</body>
+</html>

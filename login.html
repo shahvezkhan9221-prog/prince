@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome - SmartKrishi</title>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Firebase Libraries -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js" type="module"></script>
+    <style>
+        /* Set Inter font */
+        html { font-family: 'Inter', sans-serif; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        /* Custom styles for input with icon */
+        .input-with-icon {
+            position: relative;
+        }
+        .input-with-icon i {
+            position: absolute;
+            left: 0.75rem; /* p-3 */
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af; /* gray-400 */
+        }
+        .input-with-icon input {
+            padding-left: 2.75rem; /* pl-11 */
+        }
+        /* Style for the loading spinner on buttons */
+        .btn-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <!-- Background Image Container -->
+    <div class="absolute inset-0 w-full h-full object-cover z-0">
+        <img src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1932&q=80" 
+             alt="Lush green field" 
+             class="w-full h-full object-cover opacity-30">
+        <div class="absolute inset-0 bg-gradient-to-t from-white via-white/80 to-transparent"></div>
+    </div>
+
+    <!-- Main Content Container -->
+    <div class="relative min-h-screen flex flex-col items-center justify-center p-4 z-10">
+
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-green-700">SmartKrishi</h1>
+            <p class="text-lg text-gray-600">Your Digital Farming Partner</p>
+        </div>
+
+        <div class="bg-white p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-md">
+            
+            <!-- Login Form -->
+            <div id="login-form">
+                <h2 class="text-2xl font-semibold text-center text-gray-800 mb-6">Welcome Back</h2>
+                <form id="login" class="space-y-4">
+                    <div class="input-with-icon">
+                        <i class="ph ph-envelope text-xl"></i>
+                        <input type="email" id="login-email" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-green-500 focus:outline-none" placeholder="Email" required>
+                    </div>
+                    <div class="input-with-icon">
+                        <i class="ph ph-lock text-xl"></i>
+                        <input type="password" id="login-password" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-green-500 focus:outline-none" placeholder="Password" required>
+                    </div>
+                    <button type="submit" id="login-btn" class="w-full p-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center">
+                        <span class="btn-text">Login</span>
+                        <div class="btn-spinner hidden"></div>
+                    </button>
+                </form>
+                <div class="my-4 flex items-center"><hr class="flex-grow border-gray-200"><span class="mx-4 text-gray-500 text-sm">OR</span><hr class="flex-grow border-gray-200"></div>
+                <button id="google-signin-btn" class="w-full p-3 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center space-x-2">
+                    <svg class="w-5 h-5" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571l6.19,5.238C42.021,35.596,44,30.038,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path></svg>
+                    <span>Sign in with Google</span>
+                </button>
+                <div class="text-center mt-6">
+                    <p class="text-gray-600 text-sm">No account? <a id="show-register" class="text-green-600 hover:underline font-semibold cursor-pointer">Register here</a></p>
+                </div>
+            </div>
+
+            <!-- Registration Form -->
+            <div id="register-form" class="hidden">
+                <h2 class="text-2xl font-semibold text-center text-gray-800 mb-6">Create Account</h2>
+                <form id="register" class="space-y-3">
+                    <input type="text" id="reg-name" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50" placeholder="Full Name" required>
+                    <input type="email" id="reg-email" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50" placeholder="Email" required>
+                    <input type="tel" id="reg-phone" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50" placeholder="Phone Number" required>
+                    <input type="password" id="reg-password" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50" placeholder="Password (min. 6 characters)" required>
+                    <input type="number" id="reg-land" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50" placeholder="Land Holding (in acres)" required>
+                    <input type="text" id="reg-state" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50" placeholder="State (e.g., Uttar Pradesh)" required>
+                    <input type="text" id="reg-district" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50" placeholder="District (e.g., Meerut)" required>
+                    <input type="text" id="reg-block" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50" placeholder="Block" required>
+                    <input type="text" id="reg-village" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50" placeholder="Village" required>
+                    
+                    <button type="submit" id="register-btn" class="w-full p-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center">
+                        <span class="btn-text">Register</span>
+                        <div class="btn-spinner hidden"></div>
+                    </button>
+                </form>
+                <div class="text-center mt-6">
+                    <p class="text-gray-600 text-sm">Already have an account? <a id="show-login" class="text-green-600 hover:underline font-semibold cursor-pointer">Login here</a></p>
+                </div>
+            </div>
+            
+            <!-- Complete Profile Form for Google Sign-In -->
+            <div id="complete-profile-form" class="hidden">
+                <h2 class="text-2xl font-semibold text-center text-gray-800 mb-6">Complete Your Profile</h2>
+                <form id="profile-details" class="space-y-3">
+                    <input type="text" id="profile-name" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-200" readonly>
+                    <input type="email" id="profile-email" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-200" readonly>
+                    <input type="tel" id="profile-phone" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50" placeholder="Phone Number" required>
+                    <input type="number" id="profile-land" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50" placeholder="Land Holding (in acres)" required>
+                    <input type="text" id="profile-state" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50" placeholder="State (e.g., Uttar Pradesh)" required>
+                    <input type="text" id="profile-district" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50" placeholder="District (e.g., Meerut)" required>
+                    <input type="text" id="profile-block" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50" placeholder="Block" required>
+                    <input type="text" id="profile-village" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50" placeholder="Village" required>
+                    
+                    <button type="submit" id="save-profile-btn" class="w-full p-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center">
+                        <span class="btn-text">Save and Continue</span>
+                        <div class="btn-spinner hidden"></div>
+                    </button>
+                </form>
+            </div>
+
+            <div id="error-message" class="text-red-600 text-center mt-4 min-h-[1em]"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // Your web app's Firebase configuration from your project
+     const firebaseConfig = {
+               apiKey: "AIzaSyDg7g1N_Xjz6H-EdvW4CvAnwLiOsHlL5LE",
+            authDomain: "smaart-krishi.firebaseapp.com",
+            projectId: "smaart-krishi",
+            storageBucket: "smaart-krishi.firebasestorage.app",
+            messagingSenderId: "947583038951",
+            appId: "1:947583038951:web:1a75a02ff10ee54fc73942",
+            measurementId: "G-9NSMS22REQ"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- DOM Elements ---
+        const loginFormContainer = document.getElementById('login-form');
+        const registerFormContainer = document.getElementById('register-form');
+        const completeProfileContainer = document.getElementById('complete-profile-form');
+        const showRegisterLink = document.getElementById('show-register');
+        const showLoginLink = document.getElementById('show-login');
+        const errorMessageDiv = document.getElementById('error-message');
+
+        // --- Form Toggling ---
+        showRegisterLink.addEventListener('click', () => {
+            loginFormContainer.classList.add('hidden');
+            completeProfileContainer.classList.add('hidden');
+            registerFormContainer.classList.remove('hidden');
+            errorMessageDiv.textContent = '';
+        });
+        showLoginLink.addEventListener('click', () => {
+            registerFormContainer.classList.add('hidden');
+            completeProfileContainer.classList.add('hidden');
+            loginFormContainer.classList.remove('hidden');
+            errorMessageDiv.textContent = '';
+        });
+
+        // --- Button Loading State Helper ---
+        function setButtonLoading(button, isLoading) {
+            const text = button.querySelector('.btn-text');
+            const spinner = button.querySelector('.btn-spinner');
+            if (isLoading) {
+                button.disabled = true;
+                text.classList.add('hidden');
+                spinner.classList.remove('hidden');
+            } else {
+                button.disabled = false;
+                text.classList.remove('hidden');
+                spinner.classList.add('hidden');
+            }
+        }
+
+        // --- Google Sign-In Logic ---
+        document.getElementById('google-signin-btn').addEventListener('click', () => {
+            const provider = new GoogleAuthProvider();
+            signInWithPopup(auth, provider)
+                .then(async (result) => {
+                    const user = result.user;
+                    const userDocRef = doc(db, "users", user.uid);
+                    const userDoc = await getDoc(userDocRef);
+                    if (userDoc.exists()) {
+                        window.location.href = 'index.html';
+                    } else {
+                        loginFormContainer.classList.add('hidden');
+                        registerFormContainer.classList.add('hidden');
+                        completeProfileContainer.classList.remove('hidden');
+                        document.getElementById('profile-name').value = user.displayName;
+                        document.getElementById('profile-email').value = user.email;
+                    }
+                })
+                .catch((error) => { errorMessageDiv.textContent = error.message; });
+        });
+
+        // --- Handle Complete Profile Submission ---
+        const profileForm = document.getElementById('profile-details');
+        const saveProfileBtn = document.getElementById('save-profile-btn');
+        profileForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            setButtonLoading(saveProfileBtn, true);
+            const user = auth.currentUser;
+            if (!user) {
+                errorMessageDiv.textContent = "You are not logged in.";
+                setButtonLoading(saveProfileBtn, false);
+                return;
+            }
+            const userDetails = {
+                name: document.getElementById('profile-name').value,
+                email: document.getElementById('profile-email').value,
+                phone: document.getElementById('profile-phone').value,
+                landHolding: parseFloat(document.getElementById('profile-land').value),
+                state: document.getElementById('profile-state').value,
+                district: document.getElementById('profile-district').value,
+                block: document.getElementById('profile-block').value,
+                village: document.getElementById('profile-village').value,
+                userType: 'Farmer', // Default user type
+                profilePicture: user.photoURL || null // Save Google profile pic
+            };
+            try {
+                await setDoc(doc(db, "users", user.uid), userDetails);
+                window.location.href = 'index.html';
+            } catch (error) {
+                errorMessageDiv.textContent = error.message;
+                setButtonLoading(saveProfileBtn, false);
+            }
+        });
+        
+        // --- UPDATED Login Logic with Email Verification Check ---
+        const loginForm = document.getElementById('login');
+        const loginBtn = document.getElementById('login-btn');
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            setButtonLoading(loginBtn, true);
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            signInWithEmailAndPassword(auth, email, password)
+                .then((userCredential) => {
+                    if (userCredential.user.emailVerified) {
+                        window.location.href = 'index.html';
+                    } else {
+                        errorMessageDiv.textContent = "Please verify your email before logging in. Check your inbox.";
+                        setButtonLoading(loginBtn, false);
+                    }
+                })
+                .catch((error) => {
+                    errorMessageDiv.textContent = error.message;
+                    setButtonLoading(loginBtn, false);
+                });
+        });
+
+        // --- UPDATED Registration Logic with Email Verification ---
+        const registerForm = document.getElementById('register');
+        const registerBtn = document.getElementById('register-btn');
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            setButtonLoading(registerBtn, true);
+            errorMessageDiv.textContent = '';
+            
+            const name = document.getElementById('reg-name').value;
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            const phone = document.getElementById('reg-phone').value;
+            const landHolding = document.getElementById('reg-land').value;
+            const state = document.getElementById('reg-state').value;
+            const district = document.getElementById('reg-district').value;
+            const block = document.getElementById('reg-block').value;
+            const village = document.getElementById('reg-village').value;
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                // Send verification email
+                await sendEmailVerification(user);
+
+                // Save other details to Firestore
+                await setDoc(doc(db, "users", user.uid), {
+                    name, 
+                    email, 
+                    phone, 
+                    landHolding: parseFloat(landHolding), 
+                    state, 
+                    district, 
+                    block, 
+                    village,
+                    userType: 'Farmer', // Default user type
+                    profilePicture: null // No profile pic on email signup yet
+                });
+                
+                // Don't use alert, show a message
+                loginFormContainer.classList.add('hidden');
+                registerFormContainer.classList.add('hidden');
+                
+                // Show a success message where the forms were
+                const formContainer = document.querySelector('.bg-white');
+                formContainer.innerHTML = `
+                    <h2 class="text-2xl font-semibold text-center text-gray-800 mb-6">Check Your Email!</h2>
+                    <div class="text-center">
+                        <i class="ph ph-paper-plane-right text-6xl text-green-600"></i>
+                        <p class="text-gray-600 mt-4">
+                            Registration successful! We've sent a verification link to 
+                            <strong class="text-gray-800">${email}</strong>.
+                        </p>
+                        <p class="text-gray-600 mt-2">
+                            Please click the link in that email to activate your account, then you can log in.
+                        </p>
+                        <button id="back-to-login" class="mt-6 w-full p-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors">
+                            Back to Login
+                        </button>
+                    </div>
+                `;
+                formContainer.querySelector('#back-to-login').addEventListener('click', () => {
+                    window.location.reload(); // Easiest way to reset the page
+                });
+
+            } catch (error) {
+                errorMessageDiv.textContent = error.message;
+                setButtonLoading(registerBtn, false);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Logistics - SmartKrishi</title>
+    <!-- Tailwind CSS --><script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons --><script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Firebase Libraries -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js" type="module"></script>
+    <style>
+        /* Loading spinner */
+        .loading-spinner-dark {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(22, 163, 74, 0.2);
+            border-top: 4px solid #16a34a;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100 flex justify-center">
+
+    <!-- Mobile Screen Container -->
+    <div class="w-full max-w-sm h-screen bg-gray-100 flex flex-col relative overflow-hidden">
+        
+        <!-- Top Navbar -->
+        <nav class="bg-white shadow-sm w-full flex-shrink-0 z-10">
+            <div class="px-4 py-3 flex items-center">
+                <a href="mandi.html" class="text-gray-600 mr-4 p-1 rounded-full hover:bg-gray-100">
+                    <i class="ph ph-arrow-left text-2xl"></i>
+                </a>
+                <h1 class="text-xl font-bold text-green-700">Book Logistics</h1>
+            </div>
+        </nav>
+
+        <!-- Main Content Area (Scrollable) -->
+        <main class="flex-grow overflow-y-auto pb-20 p-4">
+
+            <!-- Loading State -->
+            <div id="loading-state" class="text-center p-10">
+                <div class="loading-spinner-dark mx-auto"></div>
+                <p class="text-gray-500 mt-2">Loading your info...</p>
+            </div>
+
+            <!-- Booking Form (hidden by default) -->
+            <form id="booking-form" class="hidden space-y-4">
+                <div class="bg-white p-4 rounded-xl shadow-sm space-y-4">
+                    <div>
+                        <label for="serviceType" class="block mb-1 text-sm font-medium text-gray-700">Service Type</label>
+                        <select id="serviceType" class="w-full p-3 border border-gray-300 rounded-md bg-white" required>
+                            <option value="Truck">Truck (for Mandi)</option>
+                            <option value="Tractor">Tractor (Local)</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="plotId" class="block mb-1 text-sm font-medium text-gray-700">From (My Plot)</label>
+                        <select id="plotId" class="w-full p-3 border border-gray-300 rounded-md bg-white" required>
+                            <!-- Plots will be loaded here by JS -->
+                        </select>
+                        <p id="no-plots-warning" class="text-red-500 text-sm mt-1 hidden">Please add a plot in "My Plots" first.</p>
+                    </div>
+
+                    <div>
+                        <label for="destination" class="block mb-1 text-sm font-medium text-gray-700">To (Destination)</label>
+                        <input type="text" id="destination" class="w-full p-3 border border-gray-300 rounded-md" placeholder="e.g., Meerut Mandi" required>
+                    </div>
+
+                    <div>
+                        <label for="bookingDate" class="block mb-1 text-sm font-medium text-gray-700">Booking Date</label>
+                        <input type="date" id="bookingDate" class="w-full p-3 border border-gray-300 rounded-md" required>
+                    </div>
+
+                    <div>
+                        <label for="contactPhone" class="block mb-1 text-sm font-medium text-gray-700">Contact Phone</label>
+                        <input type="tel" id="contactPhone" class="w-full p-3 border border-gray-300 rounded-md bg-gray-100" readonly>
+                    </div>
+                </div>
+                
+                <button type="submit" id="submit-booking-btn" class="w-full p-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center">
+                    Submit Booking Request
+                </button>
+            </form>
+
+        </main>
+        
+        <!-- Bottom Navigation (so user isn't trapped) -->
+        <footer class="bg-white border-t border-gray-200 w-full p-2 flex justify-around items-center absolute bottom-0 z-10">
+             <a href="index.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-house text-2xl"></i><span class="text-xs">Home</span>
+            </a>
+            <a href="mandi.html" class="flex flex-col items-center text-green-600 p-1 rounded-md transition-colors bottom-nav-item active">
+                <i class="ph ph-storefront text-2xl"></i><span class="text-xs font-semibold">Live Mandi</span>
+            </a>
+            <a href="my-plots.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-plant text-2xl"></i><span class="text-xs">My Plots</span>
+            </a>
+            <a href="questions.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-question text-2xl"></i><span class="text-xs">Questions</span>
+            </a>
+            <a href="menu.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-user-circle text-2xl"></i><span class="text-xs">Menu</span>
+            </a>
+        </footer>
+    </div>
+    
+    <!-- Simple Alert Modal -->
+    <div id="alert-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-center">
+            <h3 id="alert-title" class="text-lg font-semibold text-gray-800 mb-4">Alert</h3>
+            <p id="alert-message" class="text-gray-600 mb-6">This is an alert message.</p>
+            <button id="alert-close-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition">OK</button>
+        </div>
+    </div>
+
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, doc, getDoc, collection, getDocs, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDg7g1N_Xjz6H-EdvW4CvAnwLiOsHlL5LE",
+            authDomain: "smaart-krishi.firebaseapp.com",
+            projectId: "smaart-krishi",
+            storageBucket: "smaart-krishi.firebasestorage.app",
+            messagingSenderId: "947583038951",
+            appId: "1:947583038951:web:1a75a02ff10ee54fc73942",
+            measurementId: "G-9NSMS22REQ"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- DOM Elements ---
+        const loadingState = document.getElementById('loading-state');
+        const bookingForm = document.getElementById('booking-form');
+        const submitBookingBtn = document.getElementById('submit-booking-btn');
+        const plotSelect = document.getElementById('plotId');
+        const noPlotsWarning = document.getElementById('no-plots-warning');
+        const contactPhoneInput = document.getElementById('contactPhone');
+        const bookingDateInput = document.getElementById('bookingDate');
+        
+        // Modal Elements
+        const alertModal = document.getElementById('alert-modal');
+        const alertTitle = document.getElementById('alert-title');
+        const alertMessage = document.getElementById('alert-message');
+        const alertCloseBtn = document.getElementById('alert-close-btn');
+
+        let currentUser = null;
+
+        // --- Auth Check ---
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                loadInitialData(user.uid);
+            } else {
+                window.location.assign('login.html');
+            }
+        });
+
+        // --- Load User Data and Plots ---
+        async function loadInitialData(userId) {
+            try {
+                // 1. Get user's phone number
+                const userDocRef = doc(db, "users", userId);
+                const userDoc = await getDoc(userDocRef);
+                if (userDoc.exists()) {
+                    contactPhoneInput.value = userDoc.data().phone || '';
+                }
+
+                // 2. Get user's plots
+                const plotsRef = collection(db, "users", userId, "plots");
+                const plotsSnapshot = await getDocs(plotsRef);
+                
+                plotSelect.innerHTML = ''; // Clear loading text
+                if (plotsSnapshot.empty) {
+                    noPlotsWarning.classList.remove('hidden');
+                    plotSelect.disabled = true;
+                    submitBookingBtn.disabled = true;
+                    plotSelect.innerHTML = '<option value="">No plots found</option>';
+                } else {
+                    noPlotsWarning.classList.add('hidden');
+                    plotSelect.disabled = false;
+                    submitBookingBtn.disabled = false;
+                    plotsSnapshot.forEach(doc => {
+                        const plot = doc.data();
+                        const option = document.createElement('option');
+                        option.value = doc.id;
+                        option.textContent = plot.plotName; // e.g., "Field by the river"
+                        plotSelect.appendChild(option);
+                    });
+                }
+                
+                // 3. Set default date to today
+                bookingDateInput.valueAsDate = new Date();
+
+            } catch (error) {
+                console.error("Error loading initial data: ", error);
+                showAlert("Error", "Could not load your plots or profile. Please refresh.");
+            } finally {
+                loadingState.classList.add('hidden');
+                bookingForm.classList.remove('hidden');
+            }
+        }
+        
+        // --- Handle Booking Submission ---
+        bookingForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentUser) return;
+
+            submitBookingBtn.disabled = true;
+            submitBookingBtn.textContent = "Submitting...";
+
+            try {
+                const selectedPlotOption = plotSelect.options[plotSelect.selectedIndex];
+                
+                const bookingData = {
+                    serviceType: document.getElementById('serviceType').value,
+                    plotId: selectedPlotOption.value,
+                    plotName: selectedPlotOption.textContent, // Save the name for easy display
+                    destination: document.getElementById('destination').value,
+                    bookingDate: new Date(bookingDateInput.value),
+                    contactPhone: contactPhoneInput.value,
+                    status: "Pending", // Admin would change this later
+                    createdAt: serverTimestamp()
+                };
+
+                // Save to a new 'bookings' collection
+                const bookingsRef = collection(db, "users", currentUser.uid, "bookings");
+                await addDoc(bookingsRef, bookingData);
+                
+                showAlert("Success", "Your booking request has been submitted!");
+                
+                // Redirect to the "My Bookings" page after success
+                setTimeout(() => {
+                    window.location.assign('my-bookings.html');
+                }, 1500);
+
+            } catch (error) {
+                console.error("Error submitting booking: ", error);
+                showAlert("Error", "Could not submit booking. Please try again.");
+                submitBookingBtn.disabled = false;
+                submitBookingBtn.textContent = "Submit Booking Request";
+            }
+        });
+
+        // --- Custom Alert Modal Functions ---
+        function showAlert(title, message) {
+            alertTitle.textContent = title;
+            alertMessage.textContent = message;
+            alertModal.classList.remove('hidden');
+        }
+
+        alertCloseBtn.addEventListener('click', () => {
+            alertModal.classList.add('hidden');
+        });
+
+    </script>
+</body>
+</html>

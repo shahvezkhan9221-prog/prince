@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Profile - SmartKrishi</title>
+    <!-- Tailwind CSS --><script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons --><script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Firebase Libraries -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js" type="module"></script>
+    <style>
+        /* Loading spinner */
+        .loading-spinner-dark {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(22, 163, 74, 0.2);
+            border-top: 4px solid #16a34a;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        .loading-spinner-small {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(22, 163, 74, 0.2);
+            border-top: 2px solid #16a34a;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Hide file input */
+        input[type="file"] {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex justify-center">
+
+    <!-- Mobile Screen Container -->
+    <div class="w-full max-w-sm h-screen bg-gray-100 flex flex-col relative overflow-hidden">
+        
+        <!-- Top Navbar -->
+        <nav class="bg-white shadow-sm w-full flex-shrink-0 z-10">
+            <div class="px-4 py-3 flex items-center">
+                <a href="menu.html" class="text-gray-600 mr-4 p-1 rounded-full hover:bg-gray-100">
+                    <i class="ph ph-arrow-left text-2xl"></i>
+                </a>
+                <h1 class="text-xl font-bold text-green-700">Edit Profile</h1>
+            </div>
+        </nav>
+
+        <!-- Main Content Area (Scrollable) -->
+        <main class="flex-grow overflow-y-auto pb-20 p-4">
+
+            <!-- Loading State -->
+            <div id="loading-state" class="text-center p-10">
+                <div class="loading-spinner-dark mx-auto"></div>
+                <p class="text-gray-500 mt-2">Loading profile...</p>
+            </div>
+
+            <!-- Profile Form (hidden by default) -->
+            <form id="profile-form" class="hidden space-y-4">
+                
+                <!-- Profile Picture Section -->
+                <div class="flex flex-col items-center space-y-2">
+                    <div class="relative">
+                        <img id="profile-pic" src="" class="w-24 h-24 rounded-full object-cover border-4 border-green-200">
+                        <div id="image-upload-spinner" class="hidden absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                            <div class="loading-spinner-dark w-8 h-8 border-2 border-t-2"></div>
+                        </div>
+                    </div>
+                    <label for="image-upload" class="cursor-pointer text-sm font-medium text-green-600 hover:text-green-700">
+                        Change Picture
+                    </label>
+                    <input type="file" id="image-upload" accept="image/*">
+                </div>
+
+                <!-- Form Fields -->
+                <div class="bg-white p-4 rounded-xl shadow-sm space-y-4">
+                    <div>
+                        <label for="profile-name" class="block mb-1 text-sm font-medium text-gray-700">Full Name</label>
+                        <input type="text" id="profile-name" class="w-full p-3 border border-gray-300 rounded-md" required>
+                    </div>
+                    <div>
+                        <label for="profile-email" class="block mb-1 text-sm font-medium text-gray-700">Email (Cannot be changed)</label>
+                        <input type="email" id="profile-email" class="w-full p-3 border border-gray-300 rounded-md bg-gray-100" readonly>
+                    </div>
+                    <div>
+                        <label for="profile-phone" class="block mb-1 text-sm font-medium text-gray-700">Phone Number</label>
+                        <input type="tel" id="profile-phone" class="w-full p-3 border border-gray-300 rounded-md" required>
+                    </div>
+                    <div>
+                        <label for="profile-land" class="block mb-1 text-sm font-medium text-gray-700">Land Holding (in acres)</label>
+                        <input type="number" id="profile-land" class="w-full p-3 border border-gray-300 rounded-md" required>
+                    </div>
+                    <div>
+                        <label for="profile-state" class="block mb-1 text-sm font-medium text-gray-700">State</label>
+                        <input type="text" id="profile-state" class="w-full p-3 border border-gray-300 rounded-md" required>
+                    </div>
+                    <div>
+                        <label for="profile-district" class="block mb-1 text-sm font-medium text-gray-700">District</label>
+                        <input type="text" id="profile-district" class="w-full p-3 border border-gray-300 rounded-md" required>
+                    </div>
+                    <div>
+                        <label for="profile-block" class="block mb-1 text-sm font-medium text-gray-700">Block</label>
+                        <input type="text" id="profile-block" class="w-full p-3 border border-gray-300 rounded-md" required>
+                    </div>
+                    <div>
+                        <label for="profile-village" class="block mb-1 text-sm font-medium text-gray-700">Village</label>
+                        <input type="text" id="profile-village" class="w-full p-3 border border-gray-300 rounded-md" required>
+                    </div>
+                </div>
+                
+                <button type="submit" id="save-profile-btn" class="w-full p-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center">
+                    Save Changes
+                </button>
+            </form>
+
+        </main>
+        
+        <!-- Bottom Navigation (so user isn't trapped) -->
+        <footer class="bg-white border-t border-gray-200 w-full p-2 flex justify-around items-center absolute bottom-0 z-10">
+             <a href="index.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-house text-2xl"></i><span class="text-xs">Home</span>
+            </a>
+            <a href="mandi.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-storefront text-2xl"></i><span class="text-xs">Live Mandi</span>
+            </a>
+            <a href="my-plots.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-plant text-2xl"></i><span class="text-xs">My Plots</span>
+            </a>
+            <a href="questions.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-question text-2xl"></i><span class="text-xs">Questions</span>
+            </a>
+            <a href="menu.html" class="flex flex-col items-center text-green-600 p-1 rounded-md transition-colors bottom-nav-item active">
+                <i class="ph ph-user-circle text-2xl"></i><span class="text-xs font-semibold">Menu</span>
+            </a>
+        </footer>
+    </div>
+    
+    <!-- Simple Alert Modal -->
+    <div id="alert-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-center">
+            <h3 id="alert-title" class="text-lg font-semibold text-gray-800 mb-4">Alert</h3>
+            <p id="alert-message" class="text-gray-600 mb-6">This is an alert message.</p>
+            <button id="alert-close-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition">OK</button>
+        </div>
+    </div>
+
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDg7g1N_Xjz6H-EdvW4CvAnwLiOsHlL5LE",
+            authDomain: "smaart-krishi.firebaseapp.com",
+            projectId: "smaart-krishi",
+            storageBucket: "smaart-krishi.firebasestorage.app",
+            messagingSenderId: "947583038951",
+            appId: "1:947583038951:web:1a75a02ff10ee54fc73942",
+            measurementId: "G-9NSMS22REQ"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+
+        // --- DOM Elements ---
+        const loadingState = document.getElementById('loading-state');
+        const profileForm = document.getElementById('profile-form');
+        const profilePic = document.getElementById('profile-pic');
+        const imageUpload = document.getElementById('image-upload');
+        const imageUploadSpinner = document.getElementById('image-upload-spinner');
+        const saveProfileBtn = document.getElementById('save-profile-btn');
+        
+        // Form Fields
+        const profileNameInput = document.getElementById('profile-name');
+        const profileEmailInput = document.getElementById('profile-email');
+        const profilePhoneInput = document.getElementById('profile-phone');
+        const profileLandInput = document.getElementById('profile-land');
+        const profileStateInput = document.getElementById('profile-state');
+        const profileDistrictInput = document.getElementById('profile-district');
+        const profileBlockInput = document.getElementById('profile-block');
+        const profileVillageInput = document.getElementById('profile-village');
+        
+        // Modal Elements
+        const alertModal = document.getElementById('alert-modal');
+        const alertTitle = document.getElementById('alert-title');
+        const alertMessage = document.getElementById('alert-message');
+        const alertCloseBtn = document.getElementById('alert-close-btn');
+
+        const defaultProfileLogoUrl = "https://firebasestorage.googleapis.com/v0/b/smaart-krishi.firebasestorage.app/o/Gemini_Generated_Image_x51m66x51m66x51m.png?alt=media&token=5b1b006d-a9bc-43a1-8550-5e0b642f9dea";
+        let currentUser = null;
+        let userData = null;
+
+        // --- Auth Check ---
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                loadUserProfile(user.uid, user);
+            } else {
+                window.location.assign('login.html');
+            }
+        });
+
+        // --- Load User Profile Data ---
+        async function loadUserProfile(userId, authUser) {
+            try {
+                const userDocRef = doc(db, "users", userId);
+                const userDoc = await getDoc(userDocRef);
+                
+                if (userDoc.exists()) {
+                    userData = userDoc.data();
+                } else {
+                    console.warn("No user document found in Firestore, using auth data.");
+                    // Create a minimal userData object from auth
+                    userData = {
+                        name: authUser.displayName,
+                        email: authUser.email,
+                    };
+                }
+
+                // Populate UI
+                profileNameInput.value = userData.name || '';
+                profileEmailInput.value = userData.email || authUser.email;
+                profilePhoneInput.value = userData.phone || '';
+                profileLandInput.value = userData.landHolding || '';
+                profileStateInput.value = userData.state || '';
+                profileDistrictInput.value = userData.district || '';
+                profileBlockInput.value = userData.block || '';
+                profileVillageInput.value = userData.village || '';
+                
+                profilePic.src = userData.profilePicture || authUser.photoURL || defaultProfileLogoUrl;
+
+            } catch (error) {
+                console.error("Error loading profile:", error);
+                showAlert("Error", "Could not load your profile. Please refresh.");
+            } finally {
+                loadingState.classList.add('hidden');
+                profileForm.classList.remove('hidden');
+            }
+        }
+
+        // --- Handle Profile Picture Upload ---
+        imageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (!currentUser) return;
+
+            // Show a preview
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                profilePic.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+
+            // Start the upload
+            uploadProfilePicture(file);
+        });
+
+        async function uploadProfilePicture(file) {
+            if (!currentUser) return;
+            
+            imageUploadSpinner.classList.remove('hidden');
+            const storageRef = ref(storage, `users/${currentUser.uid}/profilePicture/${file.name}`);
+            const uploadTask = uploadBytesResumable(storageRef, file);
+
+            try {
+                await uploadTask;
+                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                
+                // Update Firestore
+                const userDocRef = doc(db, "users", currentUser.uid);
+                await updateDoc(userDocRef, {
+                    profilePicture: downloadURL
+                });
+
+                // Update the image src with the final URL
+                profilePic.src = downloadURL;
+                showAlert("Success", "Profile picture updated!");
+
+            } catch (error) {
+                console.error("Error uploading image: ", error);
+                showAlert("Upload Error", "Could not upload your picture. Please try again.");
+                // Revert to old picture if upload fails
+                profilePic.src = userData?.profilePicture || currentUser.photoURL || defaultProfileLogoUrl;
+            } finally {
+                imageUploadSpinner.classList.add('hidden');
+            }
+        }
+
+
+        // --- Handle Form Submission (Save Changes) ---
+        profileForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentUser) return;
+
+            saveProfileBtn.disabled = true;
+            saveProfileBtn.textContent = "Saving...";
+
+            try {
+                const updatedData = {
+                    name: profileNameInput.value,
+                    phone: profilePhoneInput.value,
+                    landHolding: parseFloat(profileLandInput.value) || 0,
+                    state: profileStateInput.value,
+                    district: profileDistrictInput.value,
+                    block: profileBlockInput.value,
+                    village: profileVillageInput.value
+                    // Email is not included as it's read-only
+                };
+
+                const userDocRef = doc(db, "users", currentUser.uid);
+                await updateDoc(userDocRef, updatedData);
+                
+                // Update local userData object
+                userData = { ...userData, ...updatedData };
+                
+                showAlert("Success", "Your profile has been updated!");
+
+            } catch (error) {
+                console.error("Error updating profile: ", error);
+                showAlert("Error", "Could not save changes. Please try again.");
+            } finally {
+                saveProfileBtn.disabled = false;
+                saveProfileBtn.textContent = "Save Changes";
+            }
+        });
+        
+        // --- Custom Alert Modal Functions ---
+        function showAlert(title, message) {
+            alertTitle.textContent = title;
+            alertMessage.textContent = message;
+            alertModal.classList.remove('hidden');
+        }
+
+        alertCloseBtn.addEventListener('click', () => {
+            alertModal.classList.add('hidden');
+        });
+
+    </script>
+</body>
+</html>

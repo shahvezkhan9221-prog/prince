@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plot Details - SmartKrishi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js" type="module"></script>
+    <style>
+        /* Simple loading spinner */
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(22, 163, 74, 0.2);
+            border-top: 4px solid #16a34a;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Mic button listening animation */
+        .mic-button.listening {
+            color: #3b82f6; /* blue-500 */
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex justify-center">
+
+    <div class="w-full max-w-sm h-screen bg-gray-50 flex flex-col relative overflow-hidden">
+        
+        <nav class="bg-white shadow-sm w-full flex-shrink-0 z-10">
+            <div class="px-4 py-3 flex items-center">
+                <a href="my-plots.html" class="text-gray-600 mr-4 p-1 rounded-full hover:bg-gray-100">
+                    <i class="ph ph-arrow-left text-2xl"></i>
+                </a>
+                <h1 id="plot-name-header" class="text-xl font-bold text-green-700 truncate">Loading...</h1>
+            </div>
+        </nav>
+
+        <main id="main-scroll-container" class="flex-grow overflow-y-auto pb-20 p-4 space-y-4">
+            
+            <div id="loading-state" class="text-center p-10">
+                <div class="loading-spinner mx-auto"></div>
+                <p class="text-gray-500 mt-2">Loading plot details...</p>
+            </div>
+
+            <div id="plot-details-content" class="hidden space-y-4">
+                <div class="bg-white p-4 rounded-xl shadow-sm">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-2">Plot Information</h2>
+                    <div class="space-y-1 text-gray-600">
+                        <p><strong>Area:</strong> <span id="plot-area"></span></p>
+                        <p><strong>Soil:</strong> <span id="plot-soil"></span></p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-4 rounded-xl shadow-sm">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-3">Current Crop</h2>
+                    
+                    <div id="active-crop-card" class="hidden">
+                        <h3 id="active-crop-name" class="text-2xl font-bold text-green-700"></h3>
+                        <p id="active-crop-variety" class="text-gray-600 mb-1"></p>
+                        <p class="text-gray-500 text-sm">Sown on: <span id="active-crop-date"></span></p>
+                        
+                        <div class="grid grid-cols-2 gap-3 mt-4">
+                            <button id="add-activity-btn" class="bg-blue-100 text-blue-700 font-medium px-4 py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-200 transition">
+                                <i class="ph ph-plus-circle text-lg"></i>
+                                <span>Add Activity</span>
+                            </button>
+                            <button id="mark-harvested-btn" class="bg-yellow-100 text-yellow-700 font-medium px-4 py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-yellow-200 transition">
+                                <i class="ph ph-tractor text-lg"></i>
+                                <span>Harvest</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="no-active-crop" class="hidden text-center p-4 border-2 border-dashed border-gray-300 rounded-lg">
+                        <i class="ph ph-plant text-4xl text-gray-400 mx-auto"></i>
+                        <p class="text-gray-500 mt-2 mb-3">No active crop on this plot.</p>
+                        <button id="start-cycle-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition">
+                            Start New Crop Cycle
+                        </button>
+                    </div>
+                </div>
+
+                <div id="activity-section" class="bg-white p-4 rounded-xl shadow-sm hidden">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-3">Recent Activities</h2>
+                    <div id="activity-list" class="space-y-3">
+                        </div>
+                    <p id="no-activity-text" class="text-gray-500 text-sm hidden">No activities logged yet.</p>
+                </div>
+
+                <div class="bg-white p-4 rounded-xl shadow-sm">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-3">Crop History</h2>
+                    <div id="crop-history-list" class="space-y-3">
+                        <p id="no-history-text" class="text-gray-500 text-sm">No harvested crops yet.</p>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <div id="add-cycle-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Start New Crop Cycle</h3>
+            <form id="add-cycle-form">
+                <div class="mb-4 relative">
+                    <label for="cropName" class="block mb-2 text-gray-700">Crop Name</label>
+                    <input type="text" id="cropName" class="w-full p-3 border border-gray-300 rounded-md pr-10" placeholder="e.g., Wheat" required>
+                    <button type="button" id="crop-name-mic-btn" class="mic-button absolute right-3 top-10 text-gray-500 hover:text-blue-600">
+                        <i class="ph ph-microphone text-2xl"></i>
+                    </button>
+                </div>
+                <div class="mb-4 relative">
+                    <label for="cropVariety" class="block mb-2 text-gray-700">Variety (Optional)</label>
+                    <input type="text" id="cropVariety" class="w-full p-3 border border-gray-300 rounded-md pr-10" placeholder="e.g., HD-2967">
+                    <button type="button" id="crop-variety-mic-btn" class="mic-button absolute right-3 top-10 text-gray-500 hover:text-blue-600">
+                        <i class="ph ph-microphone text-2xl"></i>
+                    </button>
+                </div>
+                <div class="mb-6">
+                    <label for="sowingDate" class="block mb-2 text-gray-700">Sowing Date</label>
+                    <input type="date" id="sowingDate" class="w-full p-3 border border-gray-300 rounded-md" required>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="cancel-cycle-btn" class="modal-cancel-btn bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition">Cancel</button>
+                    <button type="submit" id="save-cycle-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition">Save Cycle</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="add-activity-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Log an Activity</h3>
+            <form id="add-activity-form">
+                <div class="mb-4">
+                    <label for="activityDate" class="block mb-2 text-gray-700">Date</label>
+                    <input type="date" id="activityDate" class="w-full p-3 border border-gray-300 rounded-md" required>
+                </div>
+                <div class="mb-4">
+                    <label for="activityType" class="block mb-2 text-gray-700">Activity Type</label>
+                    <select id="activityType" class="w-full p-3 border border-gray-300 rounded-md bg-white">
+                        <option>Irrigation (सिंचाई)</option>
+                        <option>Fertilizer (उर्वरक)</option>
+                        <option>Pest Control (कीट नियंत्रण)</option>
+                        <option>Weeding (निराई)</option>
+                        <option>Other (अन्य)</option>
+                    </select>
+                </div>
+
+                <div id="otherActivityTypeContainer" class="hidden mb-4 relative">
+                    <label for="otherActivityType" class="block mb-2 text-gray-700">Specify Other Activity</label>
+                    <input type="text" id="otherActivityType" class="w-full p-3 border border-gray-300 rounded-md pr-10" placeholder="Type activity...">
+                    <button type="button" id="other-activity-mic-btn" class="mic-button absolute right-3 top-10 text-gray-500 hover:text-blue-600">
+                        <i class="ph ph-microphone text-2xl"></i>
+                    </button>
+                </div>
+                <div class="mb-4 relative">
+                    <label for="activityDesc" class="block mb-2 text-gray-700">Description (Optional)</label>
+                    <input type="text" id="activityDesc" class="w-full p-3 border border-gray-300 rounded-md pr-10" placeholder="e.g., 1 bag DAP">
+                    <button type="button" id="activity-desc-mic-btn" class="mic-button absolute right-3 top-10 text-gray-500 hover:text-blue-600">
+                        <i class="ph ph-microphone text-2xl"></i>
+                    </button>
+                </div>
+                <div class="mb-6">
+                    <label for="activityCost" class="block mb-2 text-gray-700">Cost (₹)</label>
+                    <input type="number" id="activityCost" class="w-full p-3 border border-gray-300 rounded-md" placeholder="1200" required>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="cancel-activity-btn" class="modal-cancel-btn bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition">Cancel</button>
+                    <button type="submit" id="save-activity-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition">Save Activity</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="mark-harvested-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Complete Harvest</h3>
+            <form id="mark-harvested-form">
+                <div class="mb-4">
+                    <label for="harvestDate" class="block mb-2 text-gray-700">Harvest Date</label>
+                    <input type="date" id="harvestDate" class="w-full p-3 border border-gray-300 rounded-md" required>
+                </div>
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="totalYield" class="block mb-2 text-gray-700">Total Yield</label>
+                        <input type="number" id="totalYield" class="w-full p-3 border border-gray-300 rounded-md" placeholder="20" required>
+                    </div>
+                    <div>
+                        <label for="yieldUnit" class="block mb-2 text-gray-700">Unit</label>
+                        <select id="yieldUnit" class="w-full p-3 border border-gray-300 rounded-md bg-white">
+                            <option>Quintals</option>
+                            <option>Kg</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-6">
+                    <label for="sellingPrice" class="block mb-2 text-gray-700">Selling Price (per Unit, ₹)</label>
+                    <input type="number" id="sellingPrice" class="w-full p-3 border border-gray-300 rounded-md" placeholder="2200">
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="cancel-harvest-btn" class="modal-cancel-btn bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition">Cancel</button>
+                    <button type="submit" id="save-harvest-btn" class="bg-yellow-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-yellow-700 transition">Complete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { 
+            getFirestore, doc, getDoc, collection, addDoc, query, where, 
+            onSnapshot, serverTimestamp, Timestamp, orderBy, updateDoc, getDocs
+        } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDg7g1N_Xjz6H-EdvW4CvAnwLiOsHlL5LE",
+            authDomain: "smaart-krishi.firebaseapp.com",
+            projectId: "smaart-krishi",
+            storageBucket: "smaart-krishi.firebasestorage.app",
+            messagingSenderId: "947583038951",
+            appId: "1:947583038951:web:1a75a02ff10ee54fc73942",
+            measurementId: "G-9NSMS22REQ"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // DOM Elements
+        const loadingState = document.getElementById('loading-state');
+        const plotDetailsContent = document.getElementById('plot-details-content');
+        const plotNameHeader = document.getElementById('plot-name-header');
+        const plotArea = document.getElementById('plot-area');
+        const plotSoil = document.getElementById('plot-soil');
+
+        // Active Crop Elements
+        const activeCropCard = document.getElementById('active-crop-card');
+        const noActiveCrop = document.getElementById('no-active-crop');
+        const activeCropName = document.getElementById('active-crop-name');
+        const activeCropVariety = document.getElementById('active-crop-variety');
+        const activeCropDate = document.getElementById('active-crop-date');
+        const addActivityBtn = document.getElementById('add-activity-btn');
+        const markHarvestedBtn = document.getElementById('mark-harvested-btn');
+        
+        // Activity List
+        const activitySection = document.getElementById('activity-section');
+        const activityList = document.getElementById('activity-list');
+        const noActivityText = document.getElementById('no-activity-text');
+
+        // History Elements
+        const cropHistoryList = document.getElementById('crop-history-list');
+        const noHistoryText = document.getElementById('no-history-text');
+
+        // "Start Cycle" Modal Elements
+        const startCycleBtn = document.getElementById('start-cycle-btn');
+        const addCycleModal = document.getElementById('add-cycle-modal');
+        const addCycleForm = document.getElementById('add-cycle-form');
+        const cancelCycleBtn = document.getElementById('cancel-cycle-btn');
+        const saveCycleBtn = document.getElementById('save-cycle-btn');
+        const cropNameInput = document.getElementById('cropName');
+        const cropVarietyInput = document.getElementById('cropVariety');
+        const cropNameMicBtn = document.getElementById('crop-name-mic-btn');
+        const cropVarietyMicBtn = document.getElementById('crop-variety-mic-btn');
+
+        // "Add Activity" Modal Elements
+        const addActivityModal = document.getElementById('add-activity-modal');
+        const addActivityForm = document.getElementById('add-activity-form');
+        const cancelActivityBtn = document.getElementById('cancel-activity-btn');
+        const saveActivityBtn = document.getElementById('save-activity-btn');
+        const activityDescInput = document.getElementById('activityDesc');
+        const activityDescMicBtn = document.getElementById('activity-desc-mic-btn');
+        // *** NEW: "Other Activity" Elements ***
+        const activityTypeSelect = document.getElementById('activityType');
+        const otherActivityTypeContainer = document.getElementById('otherActivityTypeContainer');
+        const otherActivityTypeInput = document.getElementById('otherActivityType');
+        const otherActivityMicBtn = document.getElementById('other-activity-mic-btn');
+        // *** END OF NEW ***
+
+        // "Harvest" Modal Elements
+        const markHarvestedModal = document.getElementById('mark-harvested-modal');
+        const markHarvestedForm = document.getElementById('mark-harvested-form');
+        const cancelHarvestBtn = document.getElementById('cancel-harvest-btn');
+        const saveHarvestBtn = document.getElementById('save-harvest-btn');
+
+        // Generic Modal Cancel Buttons
+        document.querySelectorAll('.modal-cancel-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const modal = btn.closest('.fixed');
+                modal.classList.add('hidden');
+                const form = modal.querySelector('form');
+                if (form) form.reset();
+
+                // *** NEW: Also reset "Other" fields if they exist in this modal ***
+                const otherContainer = modal.querySelector('#otherActivityTypeContainer');
+                if (otherContainer) {
+                    otherContainer.classList.add('hidden');
+                }
+            });
+        });
+
+        let currentUser = null;
+        let currentPlotId = null;
+        let currentActiveCycleId = null; // Store the ID of the active crop
+        let cyclesUnsubscribe = null;
+        let activitiesUnsubscribe = null;
+        
+        let recognition = null;
+        let recognitionTargetInput = null; // Store which input to fill
+
+        // --- Get plotId from URL ---
+        function getPlotIdFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('plotId');
+        }
+
+        // --- Auth Check ---
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                currentPlotId = getPlotIdFromURL();
+                if (!currentPlotId) {
+                    alert("No plot specified.");
+                    window.location.assign('my-plots.html');
+                    return;
+                }
+                setupSpeechRecognition();
+                loadPlotDetails(user.uid, currentPlotId);
+                loadCropCycles(user.uid, currentPlotId);
+            } else {
+                window.location.assign('login.html');
+            }
+        });
+
+        // --- Load Main Plot Details ---
+        async function loadPlotDetails(userId, plotId) {
+            const plotRef = doc(db, "users", userId, "plots", plotId);
+            try {
+                const docSnap = await getDoc(plotRef);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    plotNameHeader.textContent = data.plotName;
+                    plotArea.textContent = `${data.area} ${data.areaUnit}`;
+                    plotSoil.textContent = data.soilType;
+
+                    // Show content
+                    loadingState.classList.add('hidden');
+                    plotDetailsContent.classList.remove('hidden');
+                } else {
+                    console.error("No such plot!");
+                    alert("Plot not found.");
+                }
+            } catch (error) {
+                console.error("Error loading plot details: ", error);
+            }
+        }
+
+        // --- Load Active & Harvested Crops ---
+        function loadCropCycles(userId, plotId) {
+            const cyclesRef = collection(db, "users", userId, "plots", plotId, "cycles");
+            const q = query(cyclesRef, orderBy("createdAt", "desc"));
+
+            if (cyclesUnsubscribe) cyclesUnsubscribe();
+
+            cyclesUnsubscribe = onSnapshot(q, (snapshot) => {
+                let hasActiveCrop = false;
+                let hasHistory = false;
+                cropHistoryList.innerHTML = ''; // Clear history list
+
+                snapshot.forEach((doc) => {
+                    const cycleData = doc.data();
+                    const cycleId = doc.id;
+
+                    if (cycleData.status === "Active") {
+                        // Display the Active Crop
+                        hasActiveCrop = true;
+                        currentActiveCycleId = cycleId; // *** STORE THE ACTIVE ID ***
+                        activeCropName.textContent = cycleData.cropName;
+                        activeCropVariety.textContent = cycleData.variety || 'N/A';
+                        activeCropDate.textContent = cycleData.sowingDate.toDate().toLocaleDateString();
+                        loadActivities(cycleId); // Load activities for this crop
+                    } else {
+                        // Display in History
+                        hasHistory = true;
+                        const historyItem = createHistoryItem(cycleData);
+                        cropHistoryList.appendChild(historyItem);
+                    }
+                });
+
+                // --- Toggle UI Elements ---
+                activeCropCard.classList.toggle('hidden', !hasActiveCrop);
+                noActiveCrop.classList.toggle('hidden', hasActiveCrop);
+                activitySection.classList.toggle('hidden', !hasActiveCrop);
+
+                if (!hasActiveCrop) {
+                    currentActiveCycleId = null; // Clear active ID
+                    if (activitiesUnsubscribe) activitiesUnsubscribe(); // Stop listening
+                    activityList.innerHTML = '';
+                    noActivityText.classList.add('hidden');
+                }
+                
+                noHistoryText.classList.toggle('hidden', hasHistory);
+                if(!hasHistory) cropHistoryList.appendChild(noHistoryText);
+
+            }, (error) => {
+                console.error("Error loading crop cycles: ", error);
+            });
+        }
+        
+        // --- Load Activities ---
+        function loadActivities(cycleId) {
+            const activitiesRef = collection(db, "users", currentUser.uid, "plots", currentPlotId, "cycles", cycleId, "activities");
+            const q = query(activitiesRef, orderBy("date", "desc"));
+
+            if (activitiesUnsubscribe) activitiesUnsubscribe(); // Detach old listener
+
+            activitiesUnsubscribe = onSnapshot(q, (snapshot) => {
+                activityList.innerHTML = ''; // Clear old list
+                if (snapshot.empty) {
+                    noActivityText.classList.remove('hidden');
+                } else {
+                    noActivityText.classList.add('hidden');
+                    snapshot.forEach((doc) => {
+                        const activityData = doc.data();
+                        const activityItem = createActivityItem(activityData);
+                        activityList.appendChild(activityItem);
+                    });
+                }
+            });
+        }
+        
+        // --- Create Activity Item UI ---
+        function createActivityItem(data) {
+            const item = document.createElement('div');
+            item.className = "p-3 bg-gray-50 rounded-lg border border-gray-200";
+            
+            item.innerHTML = `
+                <div class="flex justify-between items-center">
+                    <h4 class="font-semibold text-gray-700">${data.type}</h4>
+                    <span class="font-bold text-lg text-red-600">- ₹${data.cost.toLocaleString('en-IN')}</span>
+                </div>
+                <p class="text-sm text-gray-600">${data.description || 'No description'}</p>
+                <p class="text-xs text-gray-400 mt-1">${data.date.toDate().toLocaleDateString()}</p>
+            `;
+            return item;
+        }
+
+        // --- Create History Card UI (with Profit) ---
+        function createHistoryItem(data) {
+            const item = document.createElement('div');
+            item.className = "p-4 bg-gray-100 rounded-lg";
+            
+            const totalCost = data.totalCost || 0;
+            const totalRevenue = (data.totalYield || 0) * (data.sellingPrice || 0);
+            const profit = totalRevenue - totalCost;
+            
+            item.innerHTML = `
+                <h4 class="text-lg font-semibold text-gray-800">${data.cropName}</h4>
+                <p class="text-sm text-gray-500 mb-3">Sown: ${data.sowingDate.toDate().toLocaleDateString()} | Harvested: ${data.harvestDate.toDate().toLocaleDateString()}</p>
+                <div class="grid grid-cols-3 gap-2 text-center">
+                    <div>
+                        <span class="text-xs text-gray-500">Revenue</span>
+                        <p class="font-semibold text-green-700 text-lg">₹${totalRevenue.toLocaleString('en-IN')}</p>
+                    </div>
+                    <div>
+                        <span class="text-xs text-gray-500">Cost</span>
+                        <p class="font-semibold text-red-700 text-lg">₹${totalCost.toLocaleString('en-IN')}</p>
+                    </div>
+                    <div>
+                        <span class="text-xs text-gray-500">Profit</span>
+                        <p class="font-semibold ${profit >= 0 ? 'text-blue-700' : 'text-red-700'} text-lg">₹${profit.toLocaleString('en-IN')}</p>
+                    </div>
+                </div>
+            `;
+            return item;
+        }
+
+        // --- "Start Cycle" Modal Listeners ---
+        startCycleBtn.addEventListener('click', () => {
+            addCycleModal.classList.remove('hidden');
+        });
+
+        addCycleForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentUser || !currentPlotId) return;
+
+            saveCycleBtn.disabled = true;
+            saveCycleBtn.textContent = "Saving...";
+
+            try {
+                const sowingDate = new Date(document.getElementById('sowingDate').value);
+
+                const cycleData = {
+                    cropName: cropNameInput.value,
+                    variety: cropVarietyInput.value,
+                    sowingDate: Timestamp.fromDate(sowingDate),
+                    status: "Active",
+                    createdAt: serverTimestamp()
+                };
+
+                const cyclesRef = collection(db, "users", currentUser.uid, "plots", currentPlotId, "cycles");
+                await addDoc(cyclesRef, cycleData);
+
+                addCycleModal.classList.add('hidden');
+                addCycleForm.reset();
+
+            } catch (error) {
+                console.error("Error starting cycle: ", error);
+                alert("Error starting cycle. Please try again.");
+            } finally {
+                saveCycleBtn.disabled = false;
+                saveCycleBtn.textContent = "Save Cycle";
+            }
+        });
+
+        // --- "Add Activity" Modal Listeners ---
+        addActivityBtn.addEventListener('click', () => {
+            document.getElementById('activityDate').valueAsDate = new Date(); // Set to today
+            addActivityModal.classList.remove('hidden');
+        });
+
+        // *** NEW: Show/Hide "Other" Activity field ***
+        activityTypeSelect.addEventListener('change', () => {
+            if (activityTypeSelect.value === 'Other (अन्य)') {
+                otherActivityTypeContainer.classList.remove('hidden');
+            } else {
+                otherActivityTypeContainer.classList.add('hidden');
+            }
+        });
+
+        // *** MODIFIED: "Add Activity" Form Submit Logic ***
+        addActivityForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentUser || !currentActiveCycleId) {
+                alert("No active crop selected.");
+                return;
+            }
+
+            saveActivityBtn.disabled = true;
+            saveActivityBtn.textContent = "Saving...";
+
+            try {
+                // *** NEW: Logic to get correct activity type ***
+                let finalActivityType = activityTypeSelect.value;
+                if (finalActivityType === 'Other (अन्य)') {
+                    finalActivityType = otherActivityTypeInput.value.trim();
+                    if (finalActivityType === '') {
+                        alert('Please specify the "Other" activity type.');
+                        saveActivityBtn.disabled = false;
+                        saveActivityBtn.textContent = "Save Activity";
+                        return; // Stop
+                    }
+                }
+                // *** END OF NEW LOGIC ***
+
+                const activityDate = new Date(document.getElementById('activityDate').value);
+                const activityData = {
+                    date: Timestamp.fromDate(activityDate),
+                    type: finalActivityType, // Use the final variable
+                    description: document.getElementById('activityDesc').value,
+                    cost: parseFloat(document.getElementById('activityCost').value) || 0,
+                    createdAt: serverTimestamp()
+                };
+
+                const activitiesRef = collection(db, "users", currentUser.uid, "plots", currentPlotId, "cycles", currentActiveCycleId, "activities");
+                await addDoc(activitiesRef, activityData);
+                
+                addActivityModal.classList.add('hidden');
+                addActivityForm.reset();
+                otherActivityTypeContainer.classList.add('hidden'); // Also reset
+                otherActivityTypeInput.value = '';
+
+            } catch (error) {
+                console.error("Error adding activity: ", error);
+                alert("Error saving activity.");
+            } finally {
+                saveActivityBtn.disabled = false;
+                saveActivityBtn.textContent = "Save Activity";
+            }
+        });
+        
+        // --- "Mark as Harvested" Modal Listeners ---
+        markHarvestedBtn.addEventListener('click', () => {
+            document.getElementById('harvestDate').valueAsDate = new Date(); // Set to today
+            markHarvestedModal.classList.remove('hidden');
+        });
+
+        markHarvestedForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentUser || !currentActiveCycleId) {
+                alert("No active crop selected.");
+                return;
+            }
+
+            saveHarvestBtn.disabled = true;
+            saveHarvestBtn.textContent = "Completing...";
+
+            try {
+                // Step 1: Calculate total cost from all activities
+                const activitiesRef = collection(db, "users", currentUser.uid, "plots", currentPlotId, "cycles", currentActiveCycleId, "activities");
+                const q = query(activitiesRef);
+                const querySnapshot = await getDocs(q);
+                
+                let totalCost = 0;
+                querySnapshot.forEach(doc => {
+                    totalCost += doc.data().cost || 0;
+                });
+
+                // Step 2: Get data from harvest form
+                const harvestDate = new Date(document.getElementById('harvestDate').value);
+                const harvestData = {
+                    status: "Harvested",
+                    harvestDate: Timestamp.fromDate(harvestDate),
+                    totalYield: parseFloat(document.getElementById('totalYield').value) || 0,
+                    yieldUnit: document.getElementById('yieldUnit').value,
+                    sellingPrice: parseFloat(document.getElementById('sellingPrice').value) || 0,
+                    totalCost: totalCost // Store the calculated cost
+                };
+                
+                // Step 3: Update the cycle document
+                const cycleRef = doc(db, "users", currentUser.uid, "plots", currentPlotId, "cycles", currentActiveCycleId);
+                await updateDoc(cycleRef, harvestData);
+
+                markHarvestedModal.classList.add('hidden');
+                markHarvestedForm.reset();
+
+            } catch (error) {
+                console.error("Error harvesting crop: ", error);
+                alert("Error completing harvest.");
+            } finally {
+                saveHarvestBtn.disabled = false;
+                saveHarvestBtn.textContent = "Complete";
+            }
+        });
+
+        // --- Unified Speech Recognition Logic ---
+        function setupSpeechRecognition() {
+            if ('webkitSpeechRecognition' in window) {
+                recognition = new webkitSpeechRecognition();
+                recognition.lang = 'hi-IN';
+                recognition.continuous = false;
+                recognition.interimResults = false;
+
+                // Bind mic buttons to set the target input
+                cropNameMicBtn.addEventListener('click', () => startListening(cropNameInput, cropNameMicBtn));
+                cropVarietyMicBtn.addEventListener('click', () => startListening(cropVarietyInput, cropVarietyMicBtn));
+                activityDescMicBtn.addEventListener('click', () => startListening(activityDescInput, activityDescMicBtn));
+                // *** NEW: Bind other activity mic ***
+                otherActivityMicBtn.addEventListener('click', () => startListening(otherActivityTypeInput, otherActivityMicBtn));
+
+                // Handle the result
+                recognition.onresult = (e) => {
+                    const transcript = e.results[0][0].transcript;
+                    if (recognitionTargetInput) {
+                        recognitionTargetInput.value += (recognitionTargetInput.value ? ' ' : '') + transcript;
+                    }
+                };
+                
+                // Handle errors
+                recognition.onerror = (e) => {
+                    console.error('Speech recognition error', e.error);
+                    document.querySelectorAll('.mic-button').forEach(btn => btn.classList.remove('listening'));
+                    recognitionTargetInput = null;
+                };
+                
+                // Handle end of speech
+                recognition.onend = () => {
+                    document.querySelectorAll('.mic-button').forEach(btn => btn.classList.remove('listening'));
+                    recognitionTargetInput = null;
+                };
+
+            } else {
+                // Hide all mic buttons if API is not supported
+                document.querySelectorAll('.mic-button').forEach(btn => btn.style.display = 'none');
+            }
+        }
+
+        function startListening(inputField, micButton) {
+            if (recognition) {
+                 // Stop any previous recognition
+                recognition.stop();
+                
+                // Set new target
+                recognitionTargetInput = inputField;
+                
+                // Reset all button styles
+                document.querySelectorAll('.mic-button').forEach(btn => btn.classList.remove('listening'));
+
+                micButton.classList.add('listening');
+                try { 
+                    recognition.start(); 
+                } catch(e) { 
+                    console.error("Mic start error", e); 
+                    micButton.classList.remove('listening');
+                }
+            }
+        }
+
+    </script>
+</body>
+</html>

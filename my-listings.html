@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My B2B Listings - SmartKrishi</title>
+    <!-- Tailwind CSS --><script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons --><script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Firebase Libraries -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js" type="module"></script>
+    <style>
+        .loading-spinner-dark {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(22, 163, 74, 0.2);
+            border-top: 4px solid #16a34a;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100 flex justify-center">
+
+    <!-- Mobile Screen Container -->
+    <div class="w-full max-w-sm h-screen bg-gray-100 flex flex-col relative overflow-hidden">
+        
+        <!-- Top Navbar -->
+        <nav class="bg-white shadow-sm w-full flex-shrink-0 z-10">
+            <div class="px-4 py-3 flex items-center justify-between">
+                <div class="flex items-center">
+                    <a href="menu.html" class="text-gray-600 mr-4 p-1 rounded-full hover:bg-gray-100">
+                        <i class="ph ph-arrow-left text-2xl"></i>
+                    </a>
+                    <h1 class="text-xl font-bold text-green-700">My B2B Listings</h1>
+                </div>
+                <a href="create-listing.html" class="text-green-600 font-medium hover:bg-green-50 p-2 rounded-lg">
+                    Create New
+                </a>
+            </div>
+        </nav>
+
+        <!-- Main Content Area (Scrollable) -->
+        <main class="flex-grow overflow-y-auto pb-20 p-4">
+
+            <!-- Loading State -->
+            <div id="loading-state" class="text-center p-10">
+                <div class="loading-spinner-dark mx-auto"></div>
+                <p class="text-gray-500 mt-2">Loading your listings...</p>
+            </div>
+            
+            <!-- Empty State -->
+            <div id="empty-state" class="hidden text-center p-10">
+                <i class="ph ph-storefront text-6xl text-gray-400 mx-auto"></i>
+                <h3 class="text-lg font-semibold text-gray-700 mt-4">No Listings Yet</h3>
+                <p class="text-gray-500">List your produce on the B2B Marketplace to sell directly to buyers.</p>
+                <a href="create-listing.html" class="mt-4 inline-block bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition">
+                    Create Your First Listing
+                </a>
+            </div>
+
+            <!-- Listing List -->
+            <div id="listing-list" class="space-y-3">
+                <!-- Listing items will be injected here by JS -->
+            </div>
+
+        </main>
+        
+        <!-- Bottom Navigation -->
+        <footer class="bg-white border-t border-gray-200 w-full p-2 flex justify-around items-center absolute bottom-0 z-10">
+             <a href="index.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-house text-2xl"></i><span class="text-xs">Home</span>
+            </a>
+             <a href="mandi.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-storefront text-2xl"></i><span class="text-xs">Live Mandi</span>
+            </a>
+             <a href="my-plots.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-plant text-2xl"></i><span class="text-xs">My Plots</span>
+            </a>
+             <a href="questions.html" class="flex flex-col items-center text-gray-500 hover:text-green-600 p-1 rounded-md transition-colors bottom-nav-item">
+                <i class="ph ph-question text-2xl"></i><span class="text-xs">Questions</span>
+            </a>
+             <a href="menu.html" class="flex flex-col items-center text-green-600 p-1 rounded-md transition-colors bottom-nav-item active">
+                <i class="ph ph-user-circle text-2xl"></i><span class="text-xs font-semibold">Menu</span>
+            </a>
+        </footer>
+    </div>
+    
+    <!-- Simple Alert Modal -->
+    <div id="alert-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-center">
+            <h3 id="alert-title" class="text-lg font-semibold text-gray-800 mb-4">Alert</h3>
+            <p id="alert-message" class="text-gray-600 mb-6">This is an alert message.</p>
+            <button id="alert-close-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition">OK</button>
+        </div>
+    </div>
+    
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h3 id="confirm-title" class="text-lg font-semibold text-gray-800 mb-4">Confirm Action</h3>
+            <p id="confirm-message" class="text-gray-600 mb-6">Are you sure?</p>
+            <div class="flex justify-end space-x-3">
+                <button id="confirm-cancel-btn" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition">Cancel</button>
+                <button id="confirm-action-btn" class="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 transition">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        // Import signInWithCustomToken
+        import { getAuth, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, query, onSnapshot, orderBy, where, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // Firebase config - Use environment variables for security
+        const firebaseConfig = typeof __firebase_config !== 'undefined'
+          ? JSON.parse(__firebase_config)
+          : {
+              // Fallback for local testing (using your provided config)
+              apiKey: "AIzaSyDg7g1N_Xjz6H-EdvW4CvAnwLiOsHlL5LE",
+              authDomain: "smaart-krishi.firebaseapp.com",
+              projectId: "smaart-krishi",
+              storageBucket: "smaart-krishi.firebasestorage.app",
+              messagingSenderId: "947583038951",
+              appId: "1:947583038951:web:1a75a02ff10ee54fc73942",
+              measurementId: "G-9NSMS22REQ"
+            };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- DOM Elements ---
+        const loadingState = document.getElementById('loading-state');
+        const emptyState = document.getElementById('empty-state');
+        const listingList = document.getElementById('listing-list');
+        
+        // Alert Modal
+        const alertModal = document.getElementById('alert-modal');
+        const alertTitle = document.getElementById('alert-title');
+        const alertMessage = document.getElementById('alert-message');
+        const alertCloseBtn = document.getElementById('alert-close-btn');
+
+        // Confirm Modal
+        const confirmModal = document.getElementById('confirm-modal');
+        const confirmTitle = document.getElementById('confirm-title');
+        const confirmMessage = document.getElementById('confirm-message');
+        const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
+        const confirmActionBtn = document.getElementById('confirm-action-btn');
+
+        let currentUser = null;
+        let listingsUnsubscribe = null;
+        let currentAction = null; // To store the function to run on confirm
+
+        // --- Auth Initialization (IMPROVED) ---
+        async function initializeAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else if (!auth.currentUser) {
+                    console.log("No auth token, awaiting redirect from onAuthStateChanged.");
+                }
+            } catch (error) {
+                console.error("Auth token sign-in failed: ", error);
+            }
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUser = user;
+                    loadMyListings(user.uid);
+                } else {
+                    window.location.assign('login.html');
+                }
+            });
+        }
+        
+        initializeAuth(); // Start auth process
+
+        // --- Load MY Listings ---
+        function loadMyListings(userId) {
+            if (listingsUnsubscribe) listingsUnsubscribe();
+
+            const listingsRef = collection(db, "b2b-listings");
+            
+            // This query requires a composite index in Firestore.
+            // Check your browser console (F12) for an error with a link to create it!
+            const q = query(listingsRef, where("sellerId", "==", userId), orderBy("createdAt", "desc"));
+
+            listingsUnsubscribe = onSnapshot(q, (snapshot) => {
+                loadingState.classList.add('hidden');
+                listingList.innerHTML = ''; // Clear old list
+
+                if (snapshot.empty) {
+                    emptyState.classList.remove('hidden');
+                } else {
+                    emptyState.classList.add('hidden');
+                    snapshot.forEach(doc => {
+                        const card = createListingCard(doc.data(), doc.id);
+                        listingList.appendChild(card);
+                    });
+                }
+            }, (error) => {
+                console.error("Error loading listings: ", error);
+                loadingState.innerHTML = `<p class="text-red-500">Error: ${error.message}</p><p class_text-sm text-gray-500">Please check the console (F12) for an index creation link.</p>`;
+            });
+        }
+
+        // --- Create Listing Card UI (with controls) ---
+        function createListingCard(data, docId) {
+            const card = document.createElement('div');
+            card.className = "bg-white rounded-xl shadow-sm overflow-hidden";
+            
+            let statusClass = 'text-gray-500 bg-gray-100';
+            if (data.status === 'Active') {
+                statusClass = 'text-green-700 bg-green-100';
+            } else if (data.status === 'Sold') {
+                statusClass = 'text-blue-700 bg-blue-100';
+            }
+            
+            const markAsSoldBtn = data.status === 'Active'
+                ? `<button data-id="${docId}" class="mark-sold-btn text-sm font-medium bg-blue-100 text-blue-700 px-3 py-1 rounded-lg hover:bg-blue-200">Mark as Sold</button>`
+                : '';
+            
+            // Added check for createdAt before calling .toDate()
+            const postedDate = data.createdAt ? data.createdAt.toDate().toLocaleDateString() : "Just now";
+
+            card.innerHTML = `
+                <div class="flex p-4 space-x-3">
+                    <img src="${data.imageUrl || 'https://placehold.co/600x400/e2e8f0/64748b?text=No+Image'}" alt="Produce" class="w-20 h-20 object-cover rounded-lg flex-shrink-0">
+                    <div class="flex-grow">
+                        <div class="flex justify-between items-start">
+                            <h3 class="text-md font-bold text-gray-900">${data.cropName}</h3>
+                            <span class="text-xs font-medium px-2 py-0.5 rounded-full ${statusClass}">
+                                ${data.status}
+                            </span>
+                        </div>
+                        <p class="text-sm text-gray-600">${data.quantity} ${data.quantityUnit}</p>
+                        <p class="text-md font-semibold text-green-700">₹${data.price} <span class="text-sm font-normal text-gray-600">/${data.priceUnit}</span></p>
+                        <p class="text-xs text-gray-400 mt-1">Posted: ${postedDate}</p>
+                    </div>
+                </div>
+                <div class="bg-gray-50 p-3 flex justify-end space-x-2">
+                    ${markAsSoldBtn}
+                    <button data-id="${docId}" class="delete-btn text-sm font-medium bg-red-100 text-red-700 px-3 py-1 rounded-lg hover:bg-red-200">Delete</button>
+                </div>
+            `;
+            
+            // --- Add Event Listeners ---
+            const markSoldBtn = card.querySelector('.mark-sold-btn');
+            if (markSoldBtn) {
+                markSoldBtn.addEventListener('click', () => {
+                    showConfirm("Mark as Sold?", "This will remove the listing from the public marketplace.", () => {
+                        updateListingStatus(docId, "Sold");
+                    });
+                });
+            }
+            
+            const deleteBtn = card.querySelector('.delete-btn');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', () => {
+                    showConfirm("Delete Listing?", "This action cannot be undone.", () => {
+                        deleteListing(docId);
+                    }, "Delete");
+                });
+            }
+
+            return card;
+        }
+
+        // --- Firestore Actions ---
+        async function updateListingStatus(docId, newStatus) {
+            try {
+                const docRef = doc(db, "b2b-listings", docId);
+                await updateDoc(docRef, { status: newStatus });
+                showAlert("Success", `Listing marked as ${newStatus}.`);
+            } catch (error) {
+                console.error("Error updating status: ", error);
+                showAlert("Error", "Could not update listing. Please try again.");
+            }
+        }
+        
+        async function deleteListing(docId) {
+            try {
+                const docRef = doc(db, "b2b-listings", docId);
+                await deleteDoc(docRef);
+                showAlert("Success", "Listing has been deleted.");
+                // Note: The onSnapshot listener will automatically remove the card from the UI
+            } catch (error) {
+                console.error("Error deleting document: ", error);
+                showAlert("Error", "Could not delete listing. Please try again.");
+            }
+        }
+
+        // --- Custom Alert Modal Functions ---
+        function showAlert(title, message) {
+            alertTitle.textContent = title;
+            alertMessage.textContent = message;
+            alertModal.classList.remove('hidden');
+        }
+        alertCloseBtn.addEventListener('click', () => {
+            alertModal.classList.add('hidden');
+        });
+
+        // --- Custom Confirm Modal Functions ---
+        function showConfirm(title, message, onConfirm, confirmText = "Confirm") {
+            confirmTitle.textContent = title;
+            confirmMessage.textContent = message;
+            confirmActionBtn.textContent = confirmText;
+            
+            // Reset button colors
+            confirmActionBtn.className = "bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition";
+            if (confirmText === "Delete") {
+                confirmActionBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                confirmActionBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+            }
+
+            currentAction = onConfirm; // Store the function to run
+            confirmModal.classList.remove('hidden');
+        }
+        
+        confirmCancelBtn.addEventListener('click', () => {
+            confirmModal.classList.add('hidden');
+            currentAction = null;
+        });
+        
+        confirmActionBtn.addEventListener('click', () => {
+            if (currentAction) {
+                currentAction(); // Run the stored function
+            }
+            confirmModal.classList.add('hidden');
+            currentAction = null;
+        });
+
+    </script>
+</body>
+</html>
